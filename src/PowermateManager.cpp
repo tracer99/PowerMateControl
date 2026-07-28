@@ -1,5 +1,6 @@
 #include "PowermateManager.h"
 #include "TriggerAction.h"
+#include "LedController.h"
 #include <hidsdi.h>
 #include <setupapi.h>
 #include <iostream>
@@ -9,14 +10,17 @@
 #include <mutex>
 #include <thread>
 
-// Static variable definitions
+namespace {
+constexpr BYTE kFeatureBrightness = 0x01;
+constexpr BYTE kFeaturePulseAlways = 0x03;
+}
+
 std::atomic<bool> PowermateManager::running(false);
 std::atomic<bool> PowermateManager::connected(false);
 std::atomic<HANDLE> PowermateManager::hDevice{ INVALID_HANDLE_VALUE };
 std::thread PowermateManager::inputThread;
 std::mutex PowermateManager::deviceMutex;
 
-// Find Powermate device Path
 bool PowermateManager::FindPowerMateDevicePath(std::wstring& out) {
     GUID g; HidD_GetHidGuid(&g);
     HDEVINFO h = SetupDiGetClassDevs(&g, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
@@ -46,12 +50,39 @@ bool PowermateManager::FindPowerMateDevicePath(std::wstring& out) {
     return false;
 }
 
-// Check if device is connected
 bool PowermateManager::IsConnected() {
     return connected.load() && hDevice.load() != INVALID_HANDLE_VALUE;
 }
 
-// Find and open the device
+bool PowermateManager::SetFeature(BYTE feature, BYTE value) {
+    HANDLE h = hDevice.load();
+    if (h == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    // Report ID 0 + Griffin Technology vendor feature layout (Aldaviva/PowerMate).
+    BYTE featureData[9] = { 0x00, 0x41, 0x01, feature, 0x00, value, 0x00, 0x00, 0x00 };
+    if (!HidD_SetFeature(h, featureData, sizeof(featureData))) {
+        std::cerr << "[Debug] HidD_SetFeature(" << static_cast<int>(feature) << ") failed: " << GetLastError() << "\n";
+        return false;
+    }
+    return true;
+}
+
+void PowermateManager::ConfigureLedDefaults() {
+    std::lock_guard<std::mutex> lock(deviceMutex);
+    // Solid brightness mode: disable always-pulse so SetLedBrightness sticks.
+    SetFeature(kFeaturePulseAlways, 0);
+}
+
+void PowermateManager::SetLedBrightness(BYTE level) {
+    std::lock_guard<std::mutex> lock(deviceMutex);
+    if (!connected.load() || hDevice.load() == INVALID_HANDLE_VALUE) {
+        return;
+    }
+    SetFeature(kFeatureBrightness, level);
+}
+
 bool PowermateManager::FindAndOpenDevice() {
     std::wstring path;
     if (!FindPowerMateDevicePath(path)) {
@@ -75,11 +106,11 @@ bool PowermateManager::FindAndOpenDevice() {
     }
 
     std::cerr << "[Debug] Powermate device connected\n";
-
+    ConfigureLedDefaults();
+    LedController::Refresh();
     return true;
 }
 
-// Start reading inputs
 void PowermateManager::StartReading() {
     std::lock_guard<std::mutex> lock(deviceMutex);
 
@@ -90,7 +121,6 @@ void PowermateManager::StartReading() {
     inputThread = std::thread(&PowermateManager::InputLoop);
 }
 
-// Handle device change (arrival/removal)
 void PowermateManager::HandleDeviceChange(WPARAM wParam) {
     std::wstring path;
 
@@ -105,13 +135,13 @@ void PowermateManager::HandleDeviceChange(WPARAM wParam) {
             Stop();
         }
     } else if (wParam == PBT_APMSUSPEND) {
-    std::wcout << L"[Debug] Suspending, stopping device\n";
-    Stop();
-    }
-    else if (wParam == PBT_APMRESUMESUSPEND) {
+        std::wcout << L"[Debug] Suspending, stopping device\n";
+        Stop();
+    } else if (wParam == PBT_APMRESUMESUSPEND) {
         if (!IsConnected()) {
             if (FindAndOpenDevice()) {
                 std::wcout << L"[Debug] Reconnected after system resume\n";
+                StartReading();
             } else {
                 connected.store(false);
                 std::wcerr << L"[Debug] Failed to reconnect Powermate after resume\n";
@@ -120,7 +150,6 @@ void PowermateManager::HandleDeviceChange(WPARAM wParam) {
     }
 }
 
-// The input reading loop
 void PowermateManager::InputLoop() {
     unsigned char buffer[8] = {};
     DWORD bytesRead = 0;
@@ -164,7 +193,7 @@ void PowermateManager::InputLoop() {
                         hDevice.store(INVALID_HANDLE_VALUE);
                     }
                 }
-                break; // Exit thread on device removal
+                break;
             }
 
             connected.store(false);
@@ -199,13 +228,10 @@ void PowermateManager::InputLoop() {
     running.store(false);
 }
 
-
-// Forward input to TriggerAction handler
 void PowermateManager::HandleInput(PowermateInputType inputType) {
     TriggerAction::HandleAction(inputType);
 }
 
-// Stop reading inputs and close device
 void PowermateManager::Stop() {
     running.store(false);
 
@@ -216,7 +242,6 @@ void PowermateManager::Stop() {
     CloseDevice();
 }
 
-// Close device handle and mark as invalid
 void PowermateManager::CloseDevice() {
     std::lock_guard<std::mutex> lock(deviceMutex);
     HANDLE device = hDevice.load();

@@ -1,7 +1,11 @@
 #include "PowermateManager.h"
+#include "ProfileManager.h"
+#include "AudioVolume.h"
+#include "LedController.h"
 #include "trayIcon.h"
 #include "version.h"
 #include <windows.h>
+#include <objbase.h>
 #include <iostream>
 
 TrayIcon trayIcon;
@@ -17,47 +21,63 @@ void InitConsole() {
     }
 }
 
-// Entry point
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR cmdLine, int) {
-
     HANDLE hMutex = CreateMutex(NULL, TRUE, L"UniqueAppMutexName");
+    if (!hMutex) {
+        std::cerr << "Failed to create mutex" << std::endl;
+        return -1;
+    }
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        std::cerr << "Application is already running" << std::endl;
+        CloseHandle(hMutex);
+        return 0;
+    }
 
-         // Exit if the app is already running
-        if (!hMutex) {
-            std::cerr << "Failed to create mutex" << std::endl;
-            return -1;
-        }
-        if (GetLastError() == ERROR_ALREADY_EXISTS) {
-            std::cerr << "Application is already running" << std::endl;
-            CloseHandle(hMutex);
-            return 0;
-        }
-
-    // Check if -debug
     if (wcsstr(cmdLine, L"-debug") != nullptr) {
         InitConsole();
     }
 
-    HWND hwnd = trayIcon.CreateTrayWindow(hInstance);  // Create tray window
+    HRESULT hrCom = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const bool comOk = SUCCEEDED(hrCom) || hrCom == S_FALSE;
+    if (!comOk) {
+        std::cerr << "[Error] CoInitializeEx failed\n";
+    }
+
+    ProfileManager::Initialize();
+    if (comOk) {
+        AudioVolume::Initialize();
+    }
+
+    HWND hwnd = trayIcon.CreateTrayWindow(hInstance);
     if (!hwnd) {
         std::cerr << "[Error] Failed to create tray window\n";
+        AudioVolume::Shutdown();
+        if (comOk) {
+            CoUninitialize();
+        }
         CloseHandle(hMutex);
         return -1;
     }
 
     if (PowermateManager::FindAndOpenDevice()) {
-    PowermateManager::StartReading();
+        PowermateManager::StartReading();
     }
-    trayIcon.InitTrayIcon(hwnd);
 
+    trayIcon.InitTrayIcon(hwnd);
     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&trayIcon));
+    LedController::Refresh();
 
     MSG msg = {};
     while (GetMessage(&msg, nullptr, 0, 0) > 0) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+
     PowermateManager::Stop();
+    AudioVolume::Shutdown();
+    if (comOk) {
+        CoUninitialize();
+    }
 
     CloseHandle(hMutex);
     return static_cast<int>(msg.wParam);

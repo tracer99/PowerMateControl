@@ -56,19 +56,22 @@ Install locally:
 
 No third-party libraries are required. The app links only Windows system libraries:
 
-- `hid` — HID device enumeration (`HidD_GetHidGuid`)
+- `hid` — HID device enumeration / feature reports (`HidD_GetHidGuid`, `HidD_SetFeature`)
 - `setupapi` — device interface discovery
 - `shell32` — system tray (`Shell_NotifyIcon`)
-- `user32`, `gdi32`, `advapi32` — UI, icons, registry (startup)
+- `user32`, `gdi32`, `advapi32` — UI, icons, registry
+- `ole32` — COM for WASAPI endpoint volume
 
 C++ standard: **C++17** or later (`std::atomic`, `std::thread`, `std::mutex`).
 
 ## Quick start (prebuilt)
 
-1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.2.1**).
+1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.3.0**).
 2. Extract and run `PowerMateControl.exe`.
 3. Plug in the PowerMate USB. A tray icon appears (connected / disconnected).
 4. Right-click the tray icon to choose a profile, enable **Run at startup**, or **Exit**.
+
+The last-selected profile is restored on startup. In the **Volume** profile, the PowerMate LED brightness tracks the system master volume (off when muted or when using **Scroll**).
 
 CI also uploads a versioned Windows x64 artifact on every push/PR to `main` if you need a build before a tagged release.
 
@@ -130,7 +133,7 @@ This project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH
 
 | File | Role |
 |---|---|
-| `VERSION` | Canonical version string (e.g. `1.2.1`) |
+| `VERSION` | Canonical version string (e.g. `1.3.0`) |
 | `CHANGELOG.md` | Human-readable release notes per version |
 | `src/version.h` | Embedded in the binary / Windows file properties |
 
@@ -165,11 +168,12 @@ The tag step fails if the changelog section is missing, `VERSION` / `version.h` 
 | Rotate left | Scroll down | Volume up |
 | Rotate right | Scroll up | Volume down |
 | Button release | Mouse double-click | Mute / unmute |
+| LED | Off | Brightness follows master volume (off when muted) |
 
 Tray menu:
 
 - Connection status
-- Profile selection (**Scroll** / **Volume**)
+- Profile selection (**Scroll** / **Volume**) — persisted in `HKCU\Software\PowerMateControl`
 - **Run at startup** — writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\PowerMateControl`
 - **Exit**
 
@@ -181,7 +185,7 @@ Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, 
 PowerMateControl/
 ├── .github/workflows/      # CI build + tagged releases
 ├── CHANGELOG.md            # Keep a Changelog release notes
-├── VERSION                 # Semver source of truth (1.2.1)
+├── VERSION                 # Semver source of truth (1.3.0)
 ├── LICENSE
 ├── README.md
 ├── scripts/
@@ -190,9 +194,12 @@ PowerMateControl/
 │   └── Get-ProjectVersion.ps1
 ├── res/                    # Icons, logo, screenshot assets
 └── src/
-    ├── main.cpp            # wWinMain, single-instance mutex, -debug
+    ├── main.cpp            # wWinMain, COM init, -debug
     ├── version.h           # PMC_VERSION_* (synced with VERSION)
-    ├── PowermateManager.*  # HID open/read loop (VID 077D / PID 0410)
+    ├── Settings.*          # HKCU profile persistence
+    ├── AudioVolume.*       # WASAPI master volume + change notify
+    ├── LedController.*     # Profile/volume → LED brightness
+    ├── PowermateManager.*  # HID open/read/LED feature reports
     ├── ProfileManager.*    # Scroll / Volume profile selection
     ├── TriggerAction.*     # SendInput for scroll, volume, mute, click
     ├── trayIcon.*          # Tray UI, menu, autostart, device notify

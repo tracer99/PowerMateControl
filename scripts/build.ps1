@@ -27,7 +27,10 @@ $CppSources = @(
     "PowermateManager.cpp",
     "ProfileManager.cpp",
     "TriggerAction.cpp",
-    "trayIcon.cpp"
+    "trayIcon.cpp",
+    "Settings.cpp",
+    "AudioVolume.cpp",
+    "LedController.cpp"
 )
 
 $ResPath = Join-Path $ObjDir "resource.res"
@@ -58,7 +61,8 @@ $LinkFlags = @(
     "shell32.lib",
     "user32.lib",
     "gdi32.lib",
-    "advapi32.lib"
+    "advapi32.lib",
+    "ole32.lib"
 )
 
 if ($Configuration -eq "Debug") {

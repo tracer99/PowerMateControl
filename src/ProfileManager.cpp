@@ -1,32 +1,39 @@
 #include "ProfileManager.h"
+#include "Settings.h"
+#include "LedController.h"
 #include <iostream>
 
-// Initialize static variable
-size_t ProfileManager::currentProfileIndex = 0;
+size_t ProfileManager::currentProfileIndex = kScrollProfile;
 
-// Static method: Return a reference to a static vector of profile names
+void ProfileManager::Initialize() {
+    DWORD saved = 0;
+    if (Settings::LoadProfile(saved) && saved < GetProfileList().size()) {
+        currentProfileIndex = saved;
+        std::wcout << L"[Debug] Loaded profile from registry: " << GetProfileList()[currentProfileIndex] << std::endl;
+    }
+}
+
 const std::vector<std::wstring>& ProfileManager::GetProfileList() {
     static const std::vector<std::wstring> profiles = {L"Scroll", L"Volume"};
     return profiles;
 }
 
-// Static method: Return the current profile index
 size_t ProfileManager::GetCurrentProfileIndex() {
     return currentProfileIndex;
 }
 
-// Static method: Return the name of the current profile
 std::wstring ProfileManager::GetCurrentProfileName() {
     const auto& profiles = GetProfileList();
     size_t idx = GetCurrentProfileIndex();
     return (idx < profiles.size()) ? profiles[idx] : L"(Invalid Profile)";
 }
 
-// Static method: Set the current profile by index
 void ProfileManager::SetCurrentProfile(int index) {
-    if (index >= 0 && index < GetProfileList().size()) {
-        currentProfileIndex = index;
-        std::wcout << L"[Debug] Current Profile set to: " << GetProfileList()[index] << std::endl;
+    if (index >= 0 && static_cast<size_t>(index) < GetProfileList().size()) {
+        currentProfileIndex = static_cast<size_t>(index);
+        Settings::SaveProfile(static_cast<DWORD>(currentProfileIndex));
+        std::wcout << L"[Debug] Current Profile set to: " << GetProfileList()[currentProfileIndex] << std::endl;
+        LedController::Refresh();
     } else {
         std::wcout << L"[Error] Invalid profile index" << std::endl;
     }

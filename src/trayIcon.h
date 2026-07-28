@@ -6,6 +6,7 @@
 #include <map>
 #include <dbt.h>
 #include <windows.h>
+#include <shellapi.h>
 #include <shlobj.h>
 #include <shobjidl.h>
 #include <comdef.h>

@@ -8,8 +8,10 @@ TrayIcon trayIcon;
 
 void InitConsole() {
     if (AllocConsole()) {
-        freopen("CONOUT$", "w", stdout);
-        freopen("CONOUT$", "w", stderr);
+        FILE* out = nullptr;
+        FILE* err = nullptr;
+        freopen_s(&out, "CONOUT$", "w", stdout);
+        freopen_s(&err, "CONOUT$", "w", stderr);
         std::cout << "[Debug] PowerMateControl " << PMC_VERSION_STRING << "\n";
         std::cout << "[Debug] Console Initialized\n";
     }

@@ -1,0 +1,8 @@
+/build/
+*.obj
+*.pdb
+*.ilk
+*.exe
+*.zip
+release-notes.md
+!res/**

@@ -1,5 +1,6 @@
 #include "PowermateManager.h"
 #include "trayIcon.h"
+#include "version.h"
 #include <windows.h>
 #include <iostream>
 
@@ -9,6 +10,7 @@ void InitConsole() {
     if (AllocConsole()) {
         freopen("CONOUT$", "w", stdout);
         freopen("CONOUT$", "w", stderr);
+        std::cout << "[Debug] PowerMateControl " << PMC_VERSION_STRING << "\n";
         std::cout << "[Debug] Console Initialized\n";
     }
 }

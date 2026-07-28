@@ -28,16 +28,24 @@ TrayIcon::~TrayIcon() {
     }
 }
 
-// Function to create the tray message-only window
+// Function to create the hidden tray owner window (must be a real top-level HWND so
+// SetForegroundWindow / TrackPopupMenu work; HWND_MESSAGE cannot become foreground).
 HWND TrayIcon::CreateTrayWindow(HINSTANCE hInstance) {
     const TCHAR CLASS_NAME[] = _T("PowermateTrayWindow");
     WNDCLASS wc = {};
     wc.lpfnWndProc = TrayWndProc;
     wc.hInstance = hInstance;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.lpszClassName = CLASS_NAME;
     RegisterClass(&wc);
-    hwndTray = CreateWindowEx(0, CLASS_NAME, _T(""), 0,
-                              0, 0, 0, 0, HWND_MESSAGE, nullptr, hInstance, nullptr);
+
+    hwndTray = CreateWindowEx(
+        WS_EX_TOOLWINDOW,
+        CLASS_NAME,
+        _T("PowerMateControl"),
+        WS_POPUP,
+        0, 0, 0, 0,
+        nullptr, nullptr, hInstance, nullptr);
     SetWindowLongPtr(hwndTray, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
     // Setup device notification for HID devices
@@ -118,12 +126,20 @@ LRESULT CALLBACK TrayIcon::TrayWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
 
     switch (uMsg) {
         case WM_USER + 1: { // Tray icon interaction
-            if (lParam == WM_RBUTTONUP) {
-                trayIcon->UpdateTrayIcon();
-                POINT pt;
+            // Avoid Shell_NotifyIcon(NIM_MODIFY) here — it can cancel the pending click.
+            if (lParam == WM_RBUTTONUP || lParam == WM_CONTEXTMENU) {
+                trayIcon->PopulateTrayMenu();
+
+                POINT pt = {};
                 GetCursorPos(&pt);
+
                 SetForegroundWindow(hwnd);
-                TrackPopupMenu(trayIcon->hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
+                TrackPopupMenu(trayIcon->hMenu, TPM_RIGHTBUTTON | TPM_BOTTOMALIGN,
+                               pt.x, pt.y, 0, hwnd, nullptr);
+                // Required so the menu dismisses correctly and subsequent clicks work.
+                PostMessage(hwnd, WM_NULL, 0, 0);
+            } else if (lParam == WM_LBUTTONUP) {
+                trayIcon->UpdateTrayIcon();
             }
             return 0;
         }
@@ -158,10 +174,11 @@ LRESULT CALLBACK TrayIcon::TrayWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
 // Function to handle tray menu selection
 void TrayIcon::HandleTrayMenuSelection(WPARAM wParam) {
     int id = LOWORD(wParam);
-    if (id >= ID_TRAY_PROFILE_BASE && id < ID_TRAY_PROFILE_BASE + (int)cachedProfiles.size()) {
+    if (id >= static_cast<int>(ID_TRAY_PROFILE_BASE) &&
+        id < static_cast<int>(ID_TRAY_PROFILE_BASE + cachedProfiles.size())) {
         ProfileManager::SetCurrentProfile(id - ID_TRAY_PROFILE_BASE);
         PopulateTrayMenu();
-    } else if (id == ID_TRAY_AUTOSTART) {
+    } else if (id == static_cast<int>(ID_TRAY_AUTOSTART)) {
         ToggleAutoStart();
         CheckMenuItem(hMenu, ID_TRAY_AUTOSTART, IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
     }

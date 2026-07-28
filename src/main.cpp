@@ -37,7 +37,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR cmdLine, int) {
         InitConsole();
     }
 
-    HRESULT hrCom = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    HRESULT hrCom = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool comOk = SUCCEEDED(hrCom) || hrCom == S_FALSE;
     if (!comOk) {
         std::cerr << "[Error] CoInitializeEx failed\n";

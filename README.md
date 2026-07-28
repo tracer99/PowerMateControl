@@ -66,7 +66,7 @@ C++ standard: **C++17** or later (`std::atomic`, `std::thread`, `std::mutex`).
 
 ## Quick start (prebuilt)
 
-1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.3.0**).
+1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.3.1**).
 2. Extract and run `PowerMateControl.exe`.
 3. Plug in the PowerMate USB. A tray icon appears (connected / disconnected).
 4. Right-click the tray icon to choose a profile, enable **Run at startup**, or **Exit**.
@@ -133,7 +133,7 @@ This project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH
 
 | File | Role |
 |---|---|
-| `VERSION` | Canonical version string (e.g. `1.3.0`) |
+| `VERSION` | Canonical version string (e.g. `1.3.1`) |
 | `CHANGELOG.md` | Human-readable release notes per version |
 | `src/version.h` | Embedded in the binary / Windows file properties |
 
@@ -185,7 +185,7 @@ Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, 
 PowerMateControl/
 ├── .github/workflows/      # CI build + tagged releases
 ├── CHANGELOG.md            # Keep a Changelog release notes
-├── VERSION                 # Semver source of truth (1.3.0)
+├── VERSION                 # Semver source of truth (1.3.1)
 ├── LICENSE
 ├── README.md
 ├── scripts/

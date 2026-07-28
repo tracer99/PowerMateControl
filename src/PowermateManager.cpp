@@ -13,11 +13,14 @@
 namespace {
 constexpr BYTE kFeatureBrightness = 0x01;
 constexpr BYTE kFeaturePulseAlways = 0x03;
+constexpr DWORD kReadWaitMs = 100;
 }
 
 std::atomic<bool> PowermateManager::running(false);
 std::atomic<bool> PowermateManager::connected(false);
 std::atomic<HANDLE> PowermateManager::hDevice{ INVALID_HANDLE_VALUE };
+std::atomic<bool> PowermateManager::ledPending{ false };
+std::atomic<BYTE> PowermateManager::ledBrightness{ 0 };
 std::thread PowermateManager::inputThread;
 std::mutex PowermateManager::deviceMutex;
 
@@ -54,8 +57,7 @@ bool PowermateManager::IsConnected() {
     return connected.load() && hDevice.load() != INVALID_HANDLE_VALUE;
 }
 
-bool PowermateManager::SetFeature(BYTE feature, BYTE value) {
-    HANDLE h = hDevice.load();
+bool PowermateManager::SetFeature(HANDLE h, BYTE feature, BYTE value) {
     if (h == INVALID_HANDLE_VALUE) {
         return false;
     }
@@ -69,18 +71,32 @@ bool PowermateManager::SetFeature(BYTE feature, BYTE value) {
     return true;
 }
 
-void PowermateManager::ConfigureLedDefaults() {
-    std::lock_guard<std::mutex> lock(deviceMutex);
-    // Solid brightness mode: disable always-pulse so SetLedBrightness sticks.
-    SetFeature(kFeaturePulseAlways, 0);
+void PowermateManager::ConfigureLedDefaults(HANDLE h) {
+    // Solid brightness mode: disable always-pulse so brightness sticks.
+    SetFeature(h, kFeaturePulseAlways, 0);
 }
 
 void PowermateManager::SetLedBrightness(BYTE level) {
-    std::lock_guard<std::mutex> lock(deviceMutex);
-    if (!connected.load() || hDevice.load() == INVALID_HANDLE_VALUE) {
+    ledBrightness.store(level);
+    ledPending.store(true);
+}
+
+void PowermateManager::ApplyPendingLed(HANDLE h) {
+    if (!ledPending.exchange(false)) {
         return;
     }
-    SetFeature(kFeatureBrightness, level);
+    SetFeature(h, kFeatureBrightness, ledBrightness.load());
+}
+
+void PowermateManager::CancelAndCloseHandle() {
+    std::lock_guard<std::mutex> lock(deviceMutex);
+    HANDLE device = hDevice.load();
+    if (device != INVALID_HANDLE_VALUE) {
+        CancelIoEx(device, nullptr);
+        CloseHandle(device);
+        hDevice.store(INVALID_HANDLE_VALUE);
+    }
+    connected.store(false);
 }
 
 bool PowermateManager::FindAndOpenDevice() {
@@ -90,9 +106,10 @@ bool PowermateManager::FindAndOpenDevice() {
         return false;
     }
 
+    // Overlapped so ReadFile can be timed out / cancelled (Exit, LED updates).
     HANDLE h = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE,
                            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-                           OPEN_EXISTING, 0, nullptr);
+                           OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
 
     if (h == INVALID_HANDLE_VALUE) {
         std::cerr << "[Debug] Failed to open Powermate\n";
@@ -106,8 +123,8 @@ bool PowermateManager::FindAndOpenDevice() {
     }
 
     std::cerr << "[Debug] Powermate device connected\n";
-    ConfigureLedDefaults();
-    LedController::Refresh();
+    ConfigureLedDefaults(h);
+    LedController::Refresh(); // queues brightness; applied on input thread
     return true;
 }
 
@@ -156,6 +173,13 @@ void PowermateManager::InputLoop() {
     bool buttonDown = false;
     int backoffMs = 1000;
 
+    HANDLE readEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (!readEvent) {
+        std::cerr << "[Error] CreateEvent failed\n";
+        running.store(false);
+        return;
+    }
+
     while (running.load()) {
         if (!IsConnected()) {
             if (FindAndOpenDevice()) {
@@ -180,30 +204,55 @@ void PowermateManager::InputLoop() {
             continue;
         }
 
-        if (!ReadFile(h, buffer, sizeof(buffer), &bytesRead, nullptr)) {
-            DWORD err = GetLastError();
-            std::cerr << "[Error] ReadFile failed: " << err << "\n";
+        ApplyPendingLed(h);
 
-            if (err == ERROR_DEVICE_NOT_CONNECTED || err == ERROR_INVALID_HANDLE) {
-                connected.store(false);
-                {
-                    std::lock_guard<std::mutex> lock(deviceMutex);
-                    if (hDevice.load() != INVALID_HANDLE_VALUE) {
-                        CloseHandle(hDevice.load());
-                        hDevice.store(INVALID_HANDLE_VALUE);
-                    }
+        OVERLAPPED ov = {};
+        ov.hEvent = readEvent;
+        ResetEvent(readEvent);
+        bytesRead = 0;
+
+        BOOL readOk = ReadFile(h, buffer, sizeof(buffer), &bytesRead, &ov);
+        if (!readOk) {
+            DWORD err = GetLastError();
+            if (err == ERROR_IO_PENDING) {
+                DWORD wait = WaitForSingleObject(readEvent, kReadWaitMs);
+                if (wait == WAIT_TIMEOUT) {
+                    CancelIoEx(h, &ov);
+                    WaitForSingleObject(readEvent, INFINITE);
+                    // Timed out with no input — loop to apply LED / check running.
+                    continue;
                 }
+                if (!GetOverlappedResult(h, &ov, &bytesRead, FALSE)) {
+                    err = GetLastError();
+                    if (err == ERROR_OPERATION_ABORTED) {
+                        continue;
+                    }
+                    std::cerr << "[Error] GetOverlappedResult failed: " << err << "\n";
+                    connected.store(false);
+                    CancelAndCloseHandle();
+                    if (!running.load()) {
+                        break;
+                    }
+                    continue;
+                }
+            } else if (err == ERROR_DEVICE_NOT_CONNECTED || err == ERROR_INVALID_HANDLE ||
+                       err == ERROR_OPERATION_ABORTED) {
+                std::cerr << "[Error] ReadFile failed: " << err << "\n";
+                connected.store(false);
+                CancelAndCloseHandle();
+                if (!running.load()) {
+                    break;
+                }
+                continue;
+            } else {
+                std::cerr << "[Error] ReadFile failed: " << err << "\n";
+                connected.store(false);
+                CancelAndCloseHandle();
                 break;
             }
+        }
 
-            connected.store(false);
-            {
-                std::lock_guard<std::mutex> lock(deviceMutex);
-                if (hDevice.load() != INVALID_HANDLE_VALUE) {
-                    CloseHandle(hDevice.load());
-                    hDevice.store(INVALID_HANDLE_VALUE);
-                }
-            }
+        if (!running.load()) {
             break;
         }
 
@@ -225,6 +274,7 @@ void PowermateManager::InputLoop() {
         }
     }
 
+    CloseHandle(readEvent);
     running.store(false);
 }
 
@@ -234,20 +284,14 @@ void PowermateManager::HandleInput(PowermateInputType inputType) {
 
 void PowermateManager::Stop() {
     running.store(false);
+    // Unblock overlapped ReadFile so join cannot hang until the knob moves.
+    CancelAndCloseHandle();
 
     if (inputThread.joinable()) {
         inputThread.join();
     }
-
-    CloseDevice();
 }
 
 void PowermateManager::CloseDevice() {
-    std::lock_guard<std::mutex> lock(deviceMutex);
-    HANDLE device = hDevice.load();
-    if (device != INVALID_HANDLE_VALUE) {
-        CloseHandle(device);
-        hDevice.store(INVALID_HANDLE_VALUE);
-    }
-    connected.store(false);
+    CancelAndCloseHandle();
 }

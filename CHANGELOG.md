@@ -9,6 +9,15 @@ Version numbers follow the upstream [magouill/PowerMateControl](https://github.c
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-07-28
+
+### Fixed
+
+- CI/local MSVC build: compile `resource.rc` with `rc.exe` and link the `.res` correctly
+- Include `shellapi.h` so tray/`NOTIFYICONDATA` APIs build under `WIN32_LEAN_AND_MEAN`
+- Embed a readable Windows file version (`VERSIONINFO` via `winver.h`)
+- Use `freopen_s` for the `-debug` console to avoid CRT deprecation warnings
+
 ## [1.2.0] - 2026-07-28
 
 Matches upstream [v1.2.0](https://github.com/magouill/PowerMateControl/releases/tag/v1.2.0). This repository is maintained independently (releases, issues, and contributions happen here).
@@ -30,5 +39,6 @@ Matches upstream [v1.2.0](https://github.com/magouill/PowerMateControl/releases/
 
 - Bluetooth PowerMate is not supported.
 
-[Unreleased]: https://github.com/tracer99/PowerMateControl/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/tracer99/PowerMateControl/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/tracer99/PowerMateControl/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/tracer99/PowerMateControl/releases/tag/v1.2.0

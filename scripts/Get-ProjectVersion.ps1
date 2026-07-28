@@ -39,7 +39,8 @@ function Set-ProjectVersionFiles([string]$Version) {
 #define PMC_VERSION_PATCH $($v.Patch)
 #define PMC_VERSION_BUILD 0
 
-#define PMC_VERSION_COMMA PMC_VERSION_MAJOR,PMC_VERSION_MINOR,PMC_VERSION_PATCH,PMC_VERSION_BUILD
+// RC has a limited preprocessor; keep the comma list as literals (not nested macros).
+#define PMC_VERSION_COMMA $($v.Major),$($v.Minor),$($v.Patch),0
 #define PMC_VERSION_STRING "$Version"
 "@
     Set-Content -Path (Join-Path $root "src\version.h") -Value $header

@@ -49,10 +49,10 @@ $CommonFlags = @(
 )
 
 $LinkFlags = @(
+    $ResPath,
     "/link",
     "/SUBSYSTEM:WINDOWS",
     "/MACHINE:X64",
-    $ResPath,
     "setupapi.lib",
     "hid.lib",
     "shell32.lib",

@@ -11,3 +11,4 @@
 #define IDC_ABOUT_MAINTAINER    303
 #define IDC_ABOUT_GITHUB        304
 #define IDC_ABOUT_ISSUES        305
+#define IDC_ABOUT_KOFI          306

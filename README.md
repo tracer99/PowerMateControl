@@ -16,6 +16,8 @@ It provides functionality for the Griffin PowerMate USB device. There is no plan
 
 This project is **independently user-maintained**. It is not affiliated with, endorsed by, or connected to Griffin Technology, the maker of the PowerMate.
 
+If you find it useful, you can [support the maintainer on Ko-fi](https://ko-fi.com/tracer_ca).
+
 <table>
   <tr>
     <td>
@@ -70,7 +72,7 @@ C++ standard: **C++17** or later (`std::atomic`, `std::thread`, `std::mutex`).
 
 ## Quick start (prebuilt)
 
-1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.4.0**).
+1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.4.2**).
 2. Extract and run `PowerMateControl.exe`.
 3. Plug in the PowerMate USB. A tray icon appears (connected / disconnected).
 4. Right-click the tray icon to choose a profile, enable **Run at startup**, or **Exit**.
@@ -137,7 +139,7 @@ This project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH
 
 | File | Role |
 |---|---|
-| `VERSION` | Canonical version string (e.g. `1.4.1`) |
+| `VERSION` | Canonical version string (e.g. `1.4.2`) |
 | `CHANGELOG.md` | Human-readable release notes per version |
 | `src/version.h` | Embedded in the binary / Windows file properties |
 
@@ -179,7 +181,7 @@ Tray menu:
 - Connection status
 - Profile selection (**Scroll** / **Volume**) — persisted as `Profile` under `HKCU\Software\PowerMateControl`
 - **Run at startup** — writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\PowerMateControl` and mirrors `Autostart` under `HKCU\Software\PowerMateControl`
-- **About...** — logo, version, maintainer (`tracer99`), links to the GitHub repository and issues
+- **About...** — logo, version, maintainer (`tracer99`), links to GitHub, issues, and [Ko-fi](https://ko-fi.com/tracer_ca)
 - **Exit**
 
 Volume changes use the default render endpoint directly (no Windows volume OSD).
@@ -192,7 +194,7 @@ Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, 
 PowerMateControl/
 ├── .github/workflows/      # CI build + tagged releases
 ├── CHANGELOG.md            # Keep a Changelog release notes
-├── VERSION                 # Semver source of truth (1.4.1)
+├── VERSION                 # Semver source of truth (1.4.2)
 ├── LICENSE
 ├── README.md
 ├── scripts/
@@ -203,7 +205,7 @@ PowerMateControl/
 └── src/
     ├── main.cpp            # wWinMain, COM init, -debug
     ├── version.h           # PMC_VERSION_* (synced with VERSION)
-    ├── AboutDialog.*       # Tray About pane (logo, version, GitHub links)
+    ├── AboutDialog.*       # Tray About pane (logo, version, GitHub / Ko-fi links)
     ├── Settings.*          # HKCU profile + autostart persistence
     ├── AudioVolume.*       # WASAPI master volume read/write + change notify
     ├── LedController.*     # Profile/volume → LED brightness / pulse
@@ -217,4 +219,4 @@ PowerMateControl/
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Forked from [magouill/PowerMateControl](https://github.com/magouill/PowerMateControl); use this repository’s releases and issues. Not affiliated with Griffin Technology.
+MIT — see [LICENSE](LICENSE). Forked from [magouill/PowerMateControl](https://github.com/magouill/PowerMateControl); use this repository’s releases and issues. Not affiliated with Griffin Technology. Tips: [ko-fi.com/tracer_ca](https://ko-fi.com/tracer_ca).

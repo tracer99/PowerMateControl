@@ -14,6 +14,7 @@ namespace {
 
 constexpr const wchar_t* kRepoUrl = L"https://github.com/tracer99/PowerMateControl";
 constexpr const wchar_t* kIssuesUrl = L"https://github.com/tracer99/PowerMateControl/issues";
+constexpr const wchar_t* kKofiUrl = L"https://ko-fi.com/tracer_ca";
 constexpr const wchar_t* kMaintainer = L"Maintainer: tracer99";
 
 struct AboutState {
@@ -201,6 +202,9 @@ INT_PTR CALLBACK AboutDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                     return TRUE;
                 case IDC_ABOUT_ISSUES:
                     OpenUrl(kIssuesUrl);
+                    return TRUE;
+                case IDC_ABOUT_KOFI:
+                    OpenUrl(kKofiUrl);
                     return TRUE;
                 case IDOK:
                 case IDCANCEL:

@@ -23,6 +23,7 @@ private:
 
 public:
     static constexpr UINT ID_TRAY_EXIT = 10000;
+    static constexpr UINT ID_TRAY_ABOUT = 4002;
     static constexpr UINT ID_TRAY_AUTOSTART = 4001;
     static constexpr const wchar_t* runKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
     static constexpr const wchar_t* approvedKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
@@ -39,4 +40,9 @@ public:
     static void ToggleAutoStart();
     static bool IsAutoStartEnabled();
     static bool WasDisabledByWindows();
+
+private:
+    // Align Run key with Settings::Autostart (recover / backfill).
+    static void SyncAutostartPreference();
+    static bool EnableAutoStartRun();
 };

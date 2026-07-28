@@ -13,6 +13,9 @@
 
 PowerMateControl is a Windows system tray application designed for Windows 11.  
 It provides functionality for the Griffin PowerMate USB device. There is no plans to support the Bluetooth version.
+
+This project is **independently user-maintained**. It is not affiliated with, endorsed by, or connected to Griffin Technology, the maker of the PowerMate.
+
 <table>
   <tr>
     <td>
@@ -61,17 +64,18 @@ No third-party libraries are required. The app links only Windows system librari
 - `shell32` — system tray (`Shell_NotifyIcon`)
 - `user32`, `gdi32`, `advapi32` — UI, icons, registry
 - `ole32` — COM for WASAPI endpoint volume
+- `windowscodecs` — WIC decode of the About dialog logo PNG
 
 C++ standard: **C++17** or later (`std::atomic`, `std::thread`, `std::mutex`).
 
 ## Quick start (prebuilt)
 
-1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.3.1**).
+1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.4.0**).
 2. Extract and run `PowerMateControl.exe`.
 3. Plug in the PowerMate USB. A tray icon appears (connected / disconnected).
 4. Right-click the tray icon to choose a profile, enable **Run at startup**, or **Exit**.
 
-The last-selected profile is restored on startup. In the **Volume** profile, the PowerMate LED brightness tracks the system master volume (off when muted or when using **Scroll**).
+The last-selected profile is restored on startup. In the **Volume** profile, the PowerMate LED brightness tracks the system master volume; it pulses when muted (or volume is zero). In **Scroll**, the LED pulses.
 
 CI also uploads a versioned Windows x64 artifact on every push/PR to `main` if you need a build before a tagged release.
 
@@ -133,7 +137,7 @@ This project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH
 
 | File | Role |
 |---|---|
-| `VERSION` | Canonical version string (e.g. `1.3.1`) |
+| `VERSION` | Canonical version string (e.g. `1.4.0`) |
 | `CHANGELOG.md` | Human-readable release notes per version |
 | `src/version.h` | Embedded in the binary / Windows file properties |
 
@@ -165,17 +169,20 @@ The tag step fails if the changelog section is missing, `VERSION` / `version.h` 
 
 | Action | Scroll profile | Volume profile |
 |---|---|---|
-| Rotate left | Scroll down | Volume up |
-| Rotate right | Scroll up | Volume down |
-| Button release | Mouse double-click | Mute / unmute |
-| LED | Off | Brightness follows master volume (off when muted) |
+| Rotate left | Scroll down | Volume up (WASAPI step) |
+| Rotate right | Scroll up | Volume down (WASAPI step) |
+| Button release | Mouse double-click | Mute / unmute (WASAPI) |
+| LED | Hardware pulse | Solid brightness follows master volume; pulse when muted or at zero |
 
 Tray menu:
 
 - Connection status
-- Profile selection (**Scroll** / **Volume**) — persisted in `HKCU\Software\PowerMateControl`
-- **Run at startup** — writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\PowerMateControl`
+- Profile selection (**Scroll** / **Volume**) — persisted as `Profile` under `HKCU\Software\PowerMateControl`
+- **Run at startup** — writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\PowerMateControl` and mirrors `Autostart` under `HKCU\Software\PowerMateControl`
+- **About...** — logo, version, maintainer (`tracer99`), links to the GitHub repository and issues
 - **Exit**
+
+Volume changes use the default render endpoint directly (no Windows volume OSD).
 
 Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, and sleep/resume are handled via `WM_DEVICECHANGE` / `WM_POWERBROADCAST`.
 
@@ -185,7 +192,7 @@ Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, 
 PowerMateControl/
 ├── .github/workflows/      # CI build + tagged releases
 ├── CHANGELOG.md            # Keep a Changelog release notes
-├── VERSION                 # Semver source of truth (1.3.1)
+├── VERSION                 # Semver source of truth (1.4.0)
 ├── LICENSE
 ├── README.md
 ├── scripts/
@@ -196,12 +203,13 @@ PowerMateControl/
 └── src/
     ├── main.cpp            # wWinMain, COM init, -debug
     ├── version.h           # PMC_VERSION_* (synced with VERSION)
-    ├── Settings.*          # HKCU profile persistence
-    ├── AudioVolume.*       # WASAPI master volume + change notify
-    ├── LedController.*     # Profile/volume → LED brightness
+    ├── AboutDialog.*       # Tray About pane (logo, version, GitHub links)
+    ├── Settings.*          # HKCU profile + autostart persistence
+    ├── AudioVolume.*       # WASAPI master volume read/write + change notify
+    ├── LedController.*     # Profile/volume → LED brightness / pulse
     ├── PowermateManager.*  # HID open/read/LED feature reports
     ├── ProfileManager.*    # Scroll / Volume profile selection
-    ├── TriggerAction.*     # SendInput for scroll, volume, mute, click
+    ├── TriggerAction.*     # Scroll/click via SendInput; volume via WASAPI
     ├── trayIcon.*          # Tray UI, menu, autostart, device notify
     ├── resource.h
     └── resource.rc         # Tray icons + VERSIONINFO
@@ -209,4 +217,4 @@ PowerMateControl/
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Forked from [magouill/PowerMateControl](https://github.com/magouill/PowerMateControl); use this repository’s releases and issues.
+MIT — see [LICENSE](LICENSE). Forked from [magouill/PowerMateControl](https://github.com/magouill/PowerMateControl); use this repository’s releases and issues. Not affiliated with Griffin Technology.

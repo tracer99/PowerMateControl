@@ -1,23 +1,10 @@
 #include "TriggerAction.h"
 #include "ProfileManager.h"
+#include "AudioVolume.h"
+#include "LedController.h"
 #include <iostream>
 
 namespace {
-
-// Helper to simulate a key press
-void SendKey(WORD key, bool extended = false) {
-    INPUT input[2] = {};
-
-    input[0].type = INPUT_KEYBOARD;
-    input[0].ki.wVk = key;
-    if (extended) input[0].ki.dwFlags = KEYEVENTF_EXTENDEDKEY;
-
-    input[1].type = INPUT_KEYBOARD;
-    input[1].ki.wVk = key;
-    input[1].ki.dwFlags = KEYEVENTF_KEYUP | (extended ? KEYEVENTF_EXTENDEDKEY : 0);
-
-    SendInput(2, input, sizeof(INPUT));
-}
 
 // Helper to simulate mouse double click
 void SendMouseDoubleClick() {
@@ -32,15 +19,6 @@ void SendMouseDoubleClick() {
     }
 
     SendInput(4, input, sizeof(INPUT));
-}
-
-// Helpers for volume control
-void ChangeVolume(bool increase) {
-    SendKey(increase ? VK_VOLUME_UP : VK_VOLUME_DOWN);
-}
-
-void ToggleMute() {
-    SendKey(VK_VOLUME_MUTE);
 }
 
 // Helpers for scroll
@@ -76,20 +54,24 @@ void TriggerAction::HandleAction(PowermateInputType inputType) {
         }
     }
     else if (profileIndex == 1) { // Volume profile
+        bool changed = false;
         switch (inputType) {
             case PowermateInputType::ROTATE_LEFT:
-                ChangeVolume(true);  // Increase volume
+                changed = AudioVolume::StepUp();
                 break;
             case PowermateInputType::ROTATE_RIGHT:
-                ChangeVolume(false);  // Decrease volume
+                changed = AudioVolume::StepDown();
                 break;
             case PowermateInputType::BUTTON_RELEASE:
-                ToggleMute();  // Mute/unmute
+                changed = AudioVolume::ToggleMute();
                 break;
             case PowermateInputType::LONG_PRESS:
                 // Switch to Scroll profile
                 ProfileManager::SetCurrentProfile(0);
                 break;
+        }
+        if (changed) {
+            LedController::Refresh();
         }
     }
 }

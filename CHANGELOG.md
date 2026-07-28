@@ -9,6 +9,20 @@ Version numbers follow the upstream [magouill/PowerMateControl](https://github.c
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-28
+
+### Added
+
+- Volume profile changes master volume via WASAPI (`VolumeStepUp` / `VolumeStepDown` / `SetMute`) instead of media keys
+- Hardware LED pulse in **Scroll** profile and when muted (or volume at zero) in **Volume** profile
+- Persist **Run at startup** preference as `Autostart` under `HKCU\Software\PowerMateControl` (still writes the Run key; recovers Run from Settings if needed)
+- Tray **About...** pane with logo, version, maintainer, and links to the GitHub repo / issues
+
+### Changed
+
+- Volume knob no longer triggers the Windows volume OSD (direct endpoint control)
+- Volume-profile LED still tracks solid brightness from master volume when unmuted
+
 ## [1.3.1] - 2026-07-28
 
 ### Fixed
@@ -56,7 +70,8 @@ Matches upstream [v1.2.0](https://github.com/magouill/PowerMateControl/releases/
 
 - Bluetooth PowerMate is not supported.
 
-[Unreleased]: https://github.com/tracer99/PowerMateControl/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/tracer99/PowerMateControl/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/tracer99/PowerMateControl/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/tracer99/PowerMateControl/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/tracer99/PowerMateControl/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/tracer99/PowerMateControl/compare/v1.2.0...v1.2.1

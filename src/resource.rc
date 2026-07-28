@@ -1,9 +1,26 @@
 #include "resource.h"
 #include "version.h"
+#include <windows.h>
 #include <winver.h>
 
 IDI_ICON_CONNECTED    ICON "../res/connected.ico"
 IDI_ICON_DISCONNECTED ICON "../res/disconnected.ico"
+
+IDB_LOGO RCDATA "../res/logo.png"
+
+IDD_ABOUT DIALOGEX 0, 0, 240, 168
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About PowerMateControl"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    CONTROL         "", IDC_ABOUT_LOGO, "Static", SS_BITMAP | SS_CENTERIMAGE | SS_REALSIZECONTROL, 70, 8, 100, 64
+    LTEXT           "PowerMateControl", -1, 10, 78, 220, 12, SS_CENTER
+    LTEXT           "", IDC_ABOUT_VERSION, 10, 92, 220, 12, SS_CENTER
+    LTEXT           "", IDC_ABOUT_MAINTAINER, 10, 106, 220, 12, SS_CENTER
+    PUSHBUTTON      "GitHub", IDC_ABOUT_GITHUB, 20, 126, 60, 14
+    PUSHBUTTON      "Report issue", IDC_ABOUT_ISSUES, 90, 126, 70, 14
+    DEFPUSHBUTTON   "OK", IDOK, 170, 126, 50, 14
+END
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION     PMC_VERSION_COMMA

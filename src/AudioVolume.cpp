@@ -156,3 +156,52 @@ bool AudioVolume::GetState(float& scalar, bool& muted) {
     muted = muteFlag != FALSE;
     return true;
 }
+
+bool AudioVolume::StepUp() {
+    std::lock_guard<std::mutex> lock(g_audioMutex);
+    if (!g_initialized.load() || !g_endpointVolume) {
+        return false;
+    }
+
+    HRESULT hr = g_endpointVolume->VolumeStepUp(nullptr);
+    if (FAILED(hr)) {
+        std::cerr << "[Error] VolumeStepUp failed: 0x" << std::hex << hr << std::dec << "\n";
+        return false;
+    }
+    return true;
+}
+
+bool AudioVolume::StepDown() {
+    std::lock_guard<std::mutex> lock(g_audioMutex);
+    if (!g_initialized.load() || !g_endpointVolume) {
+        return false;
+    }
+
+    HRESULT hr = g_endpointVolume->VolumeStepDown(nullptr);
+    if (FAILED(hr)) {
+        std::cerr << "[Error] VolumeStepDown failed: 0x" << std::hex << hr << std::dec << "\n";
+        return false;
+    }
+    return true;
+}
+
+bool AudioVolume::ToggleMute() {
+    std::lock_guard<std::mutex> lock(g_audioMutex);
+    if (!g_initialized.load() || !g_endpointVolume) {
+        return false;
+    }
+
+    BOOL muteFlag = FALSE;
+    HRESULT hr = g_endpointVolume->GetMute(&muteFlag);
+    if (FAILED(hr)) {
+        std::cerr << "[Error] GetMute failed: 0x" << std::hex << hr << std::dec << "\n";
+        return false;
+    }
+
+    hr = g_endpointVolume->SetMute(muteFlag ? FALSE : TRUE, nullptr);
+    if (FAILED(hr)) {
+        std::cerr << "[Error] SetMute failed: 0x" << std::hex << hr << std::dec << "\n";
+        return false;
+    }
+    return true;
+}

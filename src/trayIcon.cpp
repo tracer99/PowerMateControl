@@ -1,6 +1,8 @@
 #include "trayIcon.h"
 #include "PowermateManager.h"
 #include "ProfileManager.h"
+#include "Settings.h"
+#include "AboutDialog.h"
 #include "resource.h"
 #include <tchar.h>
 #include <windows.h>
@@ -72,6 +74,7 @@ void TrayIcon::InitTrayIcon(HWND hwnd) {
     nid.uCallbackMessage = WM_USER + 1;
     Shell_NotifyIcon(NIM_ADD, &nid); // Add the tray icon to the system tray
     hMenu = CreatePopupMenu();
+    SyncAutostartPreference();
     UpdateTrayIcon();
 }
 
@@ -114,7 +117,7 @@ void TrayIcon::PopulateTrayMenu() {
     }
     AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
 
-    // Add Exit
+    AppendMenu(hMenu, MF_STRING, ID_TRAY_ABOUT, L"About...");
     AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, L"Exit");
 }
 
@@ -181,6 +184,8 @@ void TrayIcon::HandleTrayMenuSelection(WPARAM wParam) {
     } else if (id == static_cast<int>(ID_TRAY_AUTOSTART)) {
         ToggleAutoStart();
         CheckMenuItem(hMenu, ID_TRAY_AUTOSTART, IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
+    } else if (id == static_cast<int>(ID_TRAY_ABOUT)) {
+        AboutDialog::Show(hwndTray);
     }
 }
 
@@ -191,7 +196,7 @@ bool TrayIcon::IsAutoStartEnabled() {
     if (RegOpenKeyExW(HKEY_CURRENT_USER, runKey, 0, KEY_READ, &hRunKey) != ERROR_SUCCESS) {
         return false;
     }
-    
+
     DWORD type = 0;
     wchar_t value[MAX_PATH];
     DWORD size = sizeof(value);
@@ -201,24 +206,68 @@ bool TrayIcon::IsAutoStartEnabled() {
     return runResult == ERROR_SUCCESS && type == REG_SZ;
 }
 
+bool TrayIcon::EnableAutoStartRun() {
+    const wchar_t* appName = L"PowerMateControl";
+    wchar_t appPath[MAX_PATH];
+    if (GetModuleFileNameW(NULL, appPath, MAX_PATH) == 0) {
+        return false;
+    }
+
+    HKEY hRunKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, runKey, 0, KEY_WRITE, &hRunKey) != ERROR_SUCCESS) {
+        return false;
+    }
+
+    LONG result = RegSetValueExW(hRunKey, appName, 0, REG_SZ, reinterpret_cast<const BYTE*>(appPath),
+                                 static_cast<DWORD>((wcslen(appPath) + 1) * sizeof(wchar_t)));
+    RegCloseKey(hRunKey);
+    return result == ERROR_SUCCESS;
+}
+
+void TrayIcon::SyncAutostartPreference() {
+    const bool runEnabled = IsAutoStartEnabled();
+    bool settingsEnabled = false;
+    const bool hasSettings = Settings::LoadAutostart(settingsEnabled);
+
+    if (hasSettings && settingsEnabled && !runEnabled) {
+        std::wcout << L"[Debug] Restoring Run at Startup from Settings\n";
+        if (EnableAutoStartRun()) {
+            return;
+        }
+    }
+
+    if (runEnabled && !hasSettings) {
+        Settings::SaveAutostart(true);
+        return;
+    }
+
+    if (runEnabled && hasSettings && !settingsEnabled) {
+        // Run is authoritative for “will Windows start us”; keep Settings aligned.
+        Settings::SaveAutostart(true);
+    }
+}
+
 // Function to handle toggling the "Run at Startup"
 void TrayIcon::ToggleAutoStart() {
     const wchar_t* appName = L"PowerMateControl";
-    wchar_t appPath[MAX_PATH];
-    if (GetModuleFileNameW(NULL, appPath, MAX_PATH) == 0) return;
+    const bool currentlyEnabled = IsAutoStartEnabled();
 
-    HKEY hRunKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, runKey, 0, KEY_WRITE, &hRunKey) != ERROR_SUCCESS) return;
-
-    if (IsAutoStartEnabled()) {
+    if (currentlyEnabled) {
+        HKEY hRunKey = nullptr;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, runKey, 0, KEY_WRITE, &hRunKey) != ERROR_SUCCESS) {
+            return;
+        }
         std::wcout << L"[Debug] Disabling Run at Startup\n";
-        RegDeleteValueW(hRunKey, appName); // Disable
-    } else {
-        std::wcout << L"[Debug] Enabling Run at Startup with path: " << appPath << std::endl;
-        RegSetValueExW(hRunKey, appName, 0, REG_SZ, (BYTE*)appPath, (DWORD)((wcslen(appPath) + 1) * sizeof(wchar_t))); // Enable
+        RegDeleteValueW(hRunKey, appName);
+        RegCloseKey(hRunKey);
+        Settings::SaveAutostart(false);
+        return;
     }
 
-    RegCloseKey(hRunKey);
+    std::wcout << L"[Debug] Enabling Run at Startup\n";
+    if (EnableAutoStartRun()) {
+        Settings::SaveAutostart(true);
+    }
 }
 
 // Check if the App is disabled by Windows settings

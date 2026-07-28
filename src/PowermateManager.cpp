@@ -13,7 +13,13 @@
 namespace {
 constexpr BYTE kFeatureBrightness = 0x01;
 constexpr BYTE kFeaturePulseAlways = 0x03;
+constexpr BYTE kFeaturePulseSpeed = 0x04;
 constexpr DWORD kReadWaitMs = 100;
+
+// Pulse speed index 4 (~3x slower than Aldaviva mid default 12), big-endian payload.
+// Encode: speed < 8 → (7 - speed) * 2  →  (7 - 4) * 2 = 6 → 0x0006.
+constexpr BYTE kPulseSpeedHi = 0x00;
+constexpr BYTE kPulseSpeedLo = 0x06;
 }
 
 std::atomic<bool> PowermateManager::running(false);
@@ -21,6 +27,7 @@ std::atomic<bool> PowermateManager::connected(false);
 std::atomic<HANDLE> PowermateManager::hDevice{ INVALID_HANDLE_VALUE };
 std::atomic<bool> PowermateManager::ledPending{ false };
 std::atomic<BYTE> PowermateManager::ledBrightness{ 0 };
+std::atomic<bool> PowermateManager::ledPulse{ false };
 std::thread PowermateManager::inputThread;
 std::mutex PowermateManager::deviceMutex;
 
@@ -58,12 +65,16 @@ bool PowermateManager::IsConnected() {
 }
 
 bool PowermateManager::SetFeature(HANDLE h, BYTE feature, BYTE value) {
+    return SetFeature(h, feature, value, 0);
+}
+
+bool PowermateManager::SetFeature(HANDLE h, BYTE feature, BYTE value0, BYTE value1) {
     if (h == INVALID_HANDLE_VALUE) {
         return false;
     }
 
     // Report ID 0 + Griffin Technology vendor feature layout (Aldaviva/PowerMate).
-    BYTE featureData[9] = { 0x00, 0x41, 0x01, feature, 0x00, value, 0x00, 0x00, 0x00 };
+    BYTE featureData[9] = { 0x00, 0x41, 0x01, feature, 0x00, value0, value1, 0x00, 0x00 };
     if (!HidD_SetFeature(h, featureData, sizeof(featureData))) {
         std::cerr << "[Debug] HidD_SetFeature(" << static_cast<int>(feature) << ") failed: " << GetLastError() << "\n";
         return false;
@@ -72,12 +83,13 @@ bool PowermateManager::SetFeature(HANDLE h, BYTE feature, BYTE value) {
 }
 
 void PowermateManager::ConfigureLedDefaults(HANDLE h) {
-    // Solid brightness mode: disable always-pulse so brightness sticks.
+    // Start solid; LedController::Refresh queues the real pulse/brightness state.
     SetFeature(h, kFeaturePulseAlways, 0);
 }
 
-void PowermateManager::SetLedBrightness(BYTE level) {
-    ledBrightness.store(level);
+void PowermateManager::SetLedState(BYTE brightness, bool pulse) {
+    ledBrightness.store(brightness);
+    ledPulse.store(pulse);
     ledPending.store(true);
 }
 
@@ -85,6 +97,14 @@ void PowermateManager::ApplyPendingLed(HANDLE h) {
     if (!ledPending.exchange(false)) {
         return;
     }
+
+    if (ledPulse.load()) {
+        SetFeature(h, kFeaturePulseAlways, 1);
+        SetFeature(h, kFeaturePulseSpeed, kPulseSpeedHi, kPulseSpeedLo);
+        return;
+    }
+
+    SetFeature(h, kFeaturePulseAlways, 0);
     SetFeature(h, kFeatureBrightness, ledBrightness.load());
 }
 
@@ -124,7 +144,7 @@ bool PowermateManager::FindAndOpenDevice() {
 
     std::cerr << "[Debug] Powermate device connected\n";
     ConfigureLedDefaults(h);
-    LedController::Refresh(); // queues brightness; applied on input thread
+    LedController::Refresh(); // queues LED state; applied on input thread
     return true;
 }
 

@@ -17,13 +17,14 @@ public:
     static void HandleDeviceChange(WPARAM wParam);
     static void HandleInput(PowermateInputType inputType);
 
-    // Queue solid LED brightness 0..255. Applied on the input thread (never blocks UI).
-    static void SetLedBrightness(BYTE level);
+    // Queue LED solid brightness and/or hardware pulse. Applied on the input thread.
+    static void SetLedState(BYTE brightness, bool pulse);
 
 private:
     static void InputLoop();
     static void CloseDevice();
     static bool SetFeature(HANDLE h, BYTE feature, BYTE value);
+    static bool SetFeature(HANDLE h, BYTE feature, BYTE value0, BYTE value1);
     static void ConfigureLedDefaults(HANDLE h);
     static void ApplyPendingLed(HANDLE h);
     static void CancelAndCloseHandle();
@@ -33,6 +34,7 @@ private:
     static std::atomic<HANDLE> hDevice;
     static std::atomic<bool> ledPending;
     static std::atomic<BYTE> ledBrightness;
+    static std::atomic<bool> ledPulse;
     static std::thread inputThread;
     static std::mutex deviceMutex;
 };

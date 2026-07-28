@@ -30,7 +30,8 @@ $CppSources = @(
     "trayIcon.cpp",
     "Settings.cpp",
     "AudioVolume.cpp",
-    "LedController.cpp"
+    "LedController.cpp",
+    "AboutDialog.cpp"
 )
 
 $ResPath = Join-Path $ObjDir "resource.res"
@@ -62,7 +63,8 @@ $LinkFlags = @(
     "user32.lib",
     "gdi32.lib",
     "advapi32.lib",
-    "ole32.lib"
+    "ole32.lib",
+    "windowscodecs.lib"
 )
 
 if ($Configuration -eq "Debug") {

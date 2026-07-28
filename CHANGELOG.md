@@ -9,6 +9,12 @@ Version numbers follow the upstream [magouill/PowerMateControl](https://github.c
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-07-28
+
+### Changed
+
+- CI: skip duplicate `main` build on `release:` commits; upgrade Actions to Node 24–compatible versions; replace `ilammy/msvc-dev-cmd` with `egor-tensin/vs-shell`; stop leftover `vctip` after build
+
 ## [1.4.0] - 2026-07-28
 
 ### Added
@@ -70,7 +76,8 @@ Matches upstream [v1.2.0](https://github.com/magouill/PowerMateControl/releases/
 
 - Bluetooth PowerMate is not supported.
 
-[Unreleased]: https://github.com/tracer99/PowerMateControl/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/tracer99/PowerMateControl/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/tracer99/PowerMateControl/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/tracer99/PowerMateControl/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/tracer99/PowerMateControl/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/tracer99/PowerMateControl/compare/v1.2.1...v1.3.0

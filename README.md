@@ -77,7 +77,7 @@ C++ standard: **C++17** or later (`std::atomic`, `std::thread`, `std::mutex`).
 
 The last-selected profile is restored on startup. In the **Volume** profile, the PowerMate LED brightness tracks the system master volume; it pulses when muted (or volume is zero). In **Scroll**, the LED pulses.
 
-CI also uploads a versioned Windows x64 artifact on every push/PR to `main` if you need a build before a tagged release.
+CI uploads a versioned Windows x64 artifact on PRs and on non-release pushes to `main` (handy before a tagged release). Commits whose message starts with `release:` skip the main-branch job so tagging does not run the Windows build twice.
 
 ## Build from source
 
@@ -137,11 +137,11 @@ This project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH
 
 | File | Role |
 |---|---|
-| `VERSION` | Canonical version string (e.g. `1.4.0`) |
+| `VERSION` | Canonical version string (e.g. `1.4.1`) |
 | `CHANGELOG.md` | Human-readable release notes per version |
 | `src/version.h` | Embedded in the binary / Windows file properties |
 
-GitHub Actions builds on every push and PR to `main`. Pushing an annotated tag `vX.Y.Z` that matches `VERSION` publishes a GitHub Release whose body is taken from that version’s changelog section, with asset `PowerMateControl-X.Y.Z-windows-x64.zip`.
+GitHub Actions builds on PRs and on non-release pushes to `main`. Pushing an annotated tag `vX.Y.Z` that matches `VERSION` builds once and publishes a GitHub Release whose body is taken from that version’s changelog section, with asset `PowerMateControl-X.Y.Z-windows-x64.zip`.
 
 ### Cut a release
 
@@ -192,7 +192,7 @@ Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, 
 PowerMateControl/
 ├── .github/workflows/      # CI build + tagged releases
 ├── CHANGELOG.md            # Keep a Changelog release notes
-├── VERSION                 # Semver source of truth (1.4.0)
+├── VERSION                 # Semver source of truth (1.4.1)
 ├── LICENSE
 ├── README.md
 ├── scripts/

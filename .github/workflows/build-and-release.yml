@@ -12,13 +12,21 @@ permissions:
 
 jobs:
   build:
+    # Tag pushes publish the GitHub Release. Main pushes only build artifacts for
+    # untagged work. Skip main when this commit is a `release: vX.Y.Z` so
+    # `git push origin main vX.Y.Z` does not run the same Windows build twice.
+    if: >
+      github.event_name == 'pull_request' ||
+      startsWith(github.ref, 'refs/tags/') ||
+      (github.ref == 'refs/heads/main' &&
+       !startsWith(github.event.head_commit.message, 'release:'))
     runs-on: windows-latest
     permissions:
       contents: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Read version
         id: version
@@ -52,14 +60,21 @@ jobs:
           Write-Host "--- release notes ---"
           Get-Content release-notes.md
 
+      # Composite action (no Node runtime). Replaces ilammy/msvc-dev-cmd@v1 (Node 20).
       - name: Setup MSVC environment
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: egor-tensin/vs-shell@v2
         with:
           arch: x64
 
       - name: Build
         shell: pwsh
         run: .\scripts\build.ps1 -Configuration Release
+
+      # VS may spawn vctip.exe; stop it so the runner does not warn about orphan processes.
+      - name: Stop MSVC tip process
+        if: always()
+        shell: pwsh
+        run: Get-Process -Name vctip -ErrorAction SilentlyContinue | Stop-Process -Force
 
       - name: Package
         shell: pwsh
@@ -70,7 +85,7 @@ jobs:
           Get-Item .\build\PowerMateControl.exe, .\$zip | Format-Table Name, Length
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: PowerMateControl-${{ steps.version.outputs.version }}-windows-x64
           path: |
@@ -80,7 +95,7 @@ jobs:
 
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: PowerMateControl ${{ steps.version.outputs.version }}
           body_path: release-notes.md

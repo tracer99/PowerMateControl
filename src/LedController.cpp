@@ -1,3 +1,8 @@
+/**
+ * @file LedController.cpp
+ * @brief Profile/volume → PowerMate LED brightness or pulse policy.
+ */
+
 #include "LedController.h"
 #include "AudioVolume.h"
 #include "PowermateManager.h"
@@ -10,7 +15,7 @@ void LedController::Refresh() {
     }
 
     if (ProfileManager::GetCurrentProfileIndex() != ProfileManager::kVolumeProfile) {
-        // Scroll: hardware pulse at fixed mid speed.
+        // Scroll profile: hardware pulse at the fixed mid-slow speed.
         PowermateManager::SetLedState(0, true);
         return;
     }

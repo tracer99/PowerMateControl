@@ -1,3 +1,8 @@
+/**
+ * @file TriggerAction.cpp
+ * @brief Scroll (SendInput) and Volume (WASAPI) actions for PowerMate events.
+ */
+
 #include "TriggerAction.h"
 #include "ProfileManager.h"
 #include "AudioVolume.h"
@@ -6,7 +11,9 @@
 
 namespace {
 
-// Helper to simulate mouse double click
+/**
+ * @brief Injects a left-button double-click via SendInput.
+ */
 void SendMouseDoubleClick() {
     INPUT input[4] = {};
 
@@ -21,7 +28,10 @@ void SendMouseDoubleClick() {
     SendInput(4, input, sizeof(INPUT));
 }
 
-// Helpers for scroll
+/**
+ * @brief Injects a vertical mouse-wheel tick.
+ * @param amount Wheel delta (typically +/- WHEEL_DELTA).
+ */
 void ScrollMouse(int amount) {
     INPUT input = {};
     input.type = INPUT_MOUSE;
@@ -32,7 +42,6 @@ void ScrollMouse(int amount) {
 
 }  // namespace
 
-// Handle different actions based on profile and input type
 void TriggerAction::HandleAction(PowermateInputType inputType) {
     size_t profileIndex = ProfileManager::GetCurrentProfileIndex();
 
@@ -71,6 +80,7 @@ void TriggerAction::HandleAction(PowermateInputType inputType) {
                 break;
         }
         if (changed) {
+            // Immediate LED update; OS notify still covers external mixer changes.
             LedController::Refresh();
         }
     }

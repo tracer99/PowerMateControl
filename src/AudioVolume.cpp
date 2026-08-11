@@ -1,3 +1,8 @@
+/**
+ * @file AudioVolume.cpp
+ * @brief WASAPI endpoint activation, volume notify callback, and step/mute writes.
+ */
+
 #include "AudioVolume.h"
 #include "LedController.h"
 
@@ -10,6 +15,10 @@
 
 namespace {
 
+/**
+ * @brief IAudioEndpointVolumeCallback that refreshes the PowerMate LED on OS volume changes.
+ * @note OnNotify must stay non-blocking; LED apply is queued/best-effort.
+ */
 class VolumeNotifyCallback : public IAudioEndpointVolumeCallback {
 public:
     VolumeNotifyCallback() : refCount_(1) {}
@@ -47,15 +56,15 @@ public:
     }
 
 private:
-    LONG refCount_;
+    LONG refCount_; /**< COM reference count. */
 };
 
-std::mutex g_audioMutex;
-IMMDeviceEnumerator* g_enumerator = nullptr;
-IMMDevice* g_device = nullptr;
-IAudioEndpointVolume* g_endpointVolume = nullptr;
-VolumeNotifyCallback* g_callback = nullptr;
-std::atomic<bool> g_initialized{ false };
+std::mutex g_audioMutex;                           /**< Guards endpoint COM pointers and init flag. */
+IMMDeviceEnumerator* g_enumerator = nullptr;       /**< MMDevice enumerator. */
+IMMDevice* g_device = nullptr;                     /**< Default multimedia render endpoint. */
+IAudioEndpointVolume* g_endpointVolume = nullptr;  /**< Volume/mute interface for g_device. */
+VolumeNotifyCallback* g_callback = nullptr;        /**< Registered control-change notify sink. */
+std::atomic<bool> g_initialized{ false };          /**< True after successful Initialize. */
 
 }  // namespace
 

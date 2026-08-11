@@ -1,3 +1,8 @@
+/**
+ * @file AboutDialog.cpp
+ * @brief About dialog: WIC-scaled logo RCDATA, version text, and URL buttons.
+ */
+
 #include "AboutDialog.h"
 #include "resource.h"
 #include "version.h"
@@ -17,10 +22,19 @@ constexpr const wchar_t* kIssuesUrl = L"https://github.com/tracer99/PowerMateCon
 constexpr const wchar_t* kKofiUrl = L"https://ko-fi.com/tracer_ca";
 constexpr const wchar_t* kMaintainer = L"Maintainer: tracer99";
 
+/** @brief Per-dialog HWND user data: owned logo bitmap. */
 struct AboutState {
-    HBITMAP logo = nullptr;
+    HBITMAP logo = nullptr; /**< Scaled logo; destroyed on WM_DESTROY. */
 };
 
+/**
+ * @brief Loads a PNG RCDATA resource via WIC and returns a 32-bpp top-down HBITMAP.
+ * @param hInst Module containing the RCDATA resource.
+ * @param resourceId RCDATA id (e.g. IDB_LOGO).
+ * @param maxWidth Maximum width in pixels (aspect ratio preserved).
+ * @param maxHeight Maximum height in pixels.
+ * @return New HBITMAP, or nullptr on failure. Caller must DeleteObject.
+ */
 HBITMAP LoadPngResourceScaled(HINSTANCE hInst, int resourceId, UINT maxWidth, UINT maxHeight) {
     HRSRC hrsrc = FindResourceW(hInst, MAKEINTRESOURCEW(resourceId), RT_RCDATA);
     if (!hrsrc) {
@@ -150,7 +164,7 @@ HBITMAP LoadPngResourceScaled(HINSTANCE hInst, int resourceId, UINT maxWidth, UI
     BITMAPINFO bmi = {};
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bmi.bmiHeader.biWidth = static_cast<LONG>(destW);
-    bmi.bmiHeader.biHeight = -static_cast<LONG>(destH); // top-down
+    bmi.bmiHeader.biHeight = -static_cast<LONG>(destH); // top-down DIB
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
@@ -171,10 +185,17 @@ HBITMAP LoadPngResourceScaled(HINSTANCE hInst, int resourceId, UINT maxWidth, UI
     return hbmp;
 }
 
+/**
+ * @brief Opens a URL with the default registered handler (ShellExecute).
+ * @param url Null-terminated URL.
+ */
 void OpenUrl(const wchar_t* url) {
     ShellExecuteW(nullptr, L"open", url, nullptr, nullptr, SW_SHOWNORMAL);
 }
 
+/**
+ * @brief Dialog procedure for IDD_ABOUT (logo, version, GitHub / issues / Ko-fi / OK).
+ */
 INT_PTR CALLBACK AboutDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_INITDIALOG: {

@@ -1,3 +1,8 @@
+/**
+ * @file trayIcon.cpp
+ * @brief Tray icon, context menu, autostart sync, and device/power message handling.
+ */
+
 #include "trayIcon.h"
 #include "PowermateManager.h"
 #include "ProfileManager.h"
@@ -11,13 +16,11 @@
 #include <iostream>
 #include <hidsdi.h>
 
-// Constructor to initialize custom icons
 TrayIcon::TrayIcon() {
-    deviceIcons[true]  = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON_CONNECTED));  // Device connected icon
-    deviceIcons[false] = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON_DISCONNECTED));  // Device disconnected icon
+    deviceIcons[true]  = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON_CONNECTED));
+    deviceIcons[false] = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON_DISCONNECTED));
 }
 
-// Destructor: Cleaning up
 TrayIcon::~TrayIcon() {
     Shell_NotifyIcon(NIM_DELETE, &nid);
     DestroyIcon(deviceIcons[true]);
@@ -30,8 +33,6 @@ TrayIcon::~TrayIcon() {
     }
 }
 
-// Function to create the hidden tray owner window (must be a real top-level HWND so
-// SetForegroundWindow / TrackPopupMenu work; HWND_MESSAGE cannot become foreground).
 HWND TrayIcon::CreateTrayWindow(HINSTANCE hInstance) {
     const TCHAR CLASS_NAME[] = _T("PowermateTrayWindow");
     WNDCLASS wc = {};
@@ -41,6 +42,7 @@ HWND TrayIcon::CreateTrayWindow(HINSTANCE hInstance) {
     wc.lpszClassName = CLASS_NAME;
     RegisterClass(&wc);
 
+    // Real top-level HWND required: HWND_MESSAGE cannot become foreground for menus.
     hwndTray = CreateWindowEx(
         WS_EX_TOOLWINDOW,
         CLASS_NAME,
@@ -50,7 +52,6 @@ HWND TrayIcon::CreateTrayWindow(HINSTANCE hInstance) {
         nullptr, nullptr, hInstance, nullptr);
     SetWindowLongPtr(hwndTray, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
-    // Setup device notification for HID devices
     DEV_BROADCAST_DEVICEINTERFACE NotificationFilter = {};
     NotificationFilter.dbcc_size = sizeof(NotificationFilter);
     NotificationFilter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
@@ -64,7 +65,6 @@ HWND TrayIcon::CreateTrayWindow(HINSTANCE hInstance) {
     return hwndTray;
 }
 
-// Function to initialize the tray icon and menu
 void TrayIcon::InitTrayIcon(HWND hwnd) {
     ZeroMemory(&nid, sizeof(nid));
     nid.cbSize = sizeof(nid);
@@ -72,13 +72,12 @@ void TrayIcon::InitTrayIcon(HWND hwnd) {
     nid.uID = 1;
     nid.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
     nid.uCallbackMessage = WM_USER + 1;
-    Shell_NotifyIcon(NIM_ADD, &nid); // Add the tray icon to the system tray
+    Shell_NotifyIcon(NIM_ADD, &nid);
     hMenu = CreatePopupMenu();
     SyncAutostartPreference();
     UpdateTrayIcon();
 }
 
-// Function to update tray icon based on device status
 void TrayIcon::UpdateTrayIcon() {
     bool isConnected = PowermateManager::IsConnected();
     nid.hIcon = deviceIcons[isConnected];
@@ -87,17 +86,14 @@ void TrayIcon::UpdateTrayIcon() {
     PopulateTrayMenu();
 }
 
-// Function to populate the tray menu
 void TrayIcon::PopulateTrayMenu() {
     if (hMenu != NULL) {
         while (DeleteMenu(hMenu, 0, MF_BYPOSITION)) {}
     }
 
-    // Add device status
     AppendMenu(hMenu, MF_STRING | MF_GRAYED, 0, PowermateManager::IsConnected() ? L"Powermate connected" : L"Powermate disconnected");
     AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
 
-    // Add profile entries
     const std::vector<std::wstring>& profiles = cachedProfiles;
     size_t currentProfile = ProfileManager::GetCurrentProfileIndex();
     for (size_t i = 0; i < profiles.size(); ++i) {
@@ -108,11 +104,9 @@ void TrayIcon::PopulateTrayMenu() {
         AppendMenu(hMenu, flags, ID_TRAY_PROFILE_BASE + i, profiles[i].c_str());
     }
     AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-    
-    // Add "Run at startup" checkbox
+
     AppendMenuW(hMenu, MF_STRING | (IsAutoStartEnabled() ? MF_CHECKED : 0), ID_TRAY_AUTOSTART, L"Run at startup");
-    if (IsAutoStartEnabled() && WasDisabledByWindows()) { 
-        // Add note if startup is blocked by Windows
+    if (IsAutoStartEnabled() && WasDisabledByWindows()) {
         AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 0, L"Disabled in Windows Startup settings");
     }
     AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
@@ -121,7 +115,6 @@ void TrayIcon::PopulateTrayMenu() {
     AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, L"Exit");
 }
 
-// Function to handle tray message
 LRESULT CALLBACK TrayIcon::TrayWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     auto* trayIcon = reinterpret_cast<TrayIcon*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
     if (!trayIcon)
@@ -147,7 +140,7 @@ LRESULT CALLBACK TrayIcon::TrayWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
             return 0;
         }
 
-        case WM_COMMAND: { // Tray menu selection
+        case WM_COMMAND: {
             if (LOWORD(wParam) == ID_TRAY_EXIT)
                 PostQuitMessage(0);
             else
@@ -155,13 +148,13 @@ LRESULT CALLBACK TrayIcon::TrayWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
             return 0;
         }
 
-        case WM_DEVICECHANGE: { // Device plugged/unplugged
+        case WM_DEVICECHANGE: {
             PowermateManager::HandleDeviceChange(wParam);
             trayIcon->UpdateTrayIcon();
             return 0;
         }
-        
-        case WM_POWERBROADCAST: { // System suspend/resume
+
+        case WM_POWERBROADCAST: {
             if (wParam == PBT_APMSUSPEND || wParam == PBT_APMRESUMESUSPEND) {
                 PowermateManager::HandleDeviceChange(wParam);
                 trayIcon->UpdateTrayIcon();
@@ -174,7 +167,6 @@ LRESULT CALLBACK TrayIcon::TrayWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
     }
 }
 
-// Function to handle tray menu selection
 void TrayIcon::HandleTrayMenuSelection(WPARAM wParam) {
     int id = LOWORD(wParam);
     if (id >= static_cast<int>(ID_TRAY_PROFILE_BASE) &&
@@ -189,7 +181,6 @@ void TrayIcon::HandleTrayMenuSelection(WPARAM wParam) {
     }
 }
 
-// Run at Startup
 bool TrayIcon::IsAutoStartEnabled() {
     const wchar_t* appName = L"PowerMateControl";
     HKEY hRunKey;
@@ -247,7 +238,6 @@ void TrayIcon::SyncAutostartPreference() {
     }
 }
 
-// Function to handle toggling the "Run at Startup"
 void TrayIcon::ToggleAutoStart() {
     const wchar_t* appName = L"PowerMateControl";
     const bool currentlyEnabled = IsAutoStartEnabled();
@@ -270,7 +260,6 @@ void TrayIcon::ToggleAutoStart() {
     }
 }
 
-// Check if the App is disabled by Windows settings
 bool TrayIcon::WasDisabledByWindows() {
     BYTE binaryStatus[12] = {};
     DWORD dwSize = sizeof(binaryStatus);
@@ -279,7 +268,7 @@ bool TrayIcon::WasDisabledByWindows() {
     if (result != ERROR_SUCCESS) {
         return false;
     }
-    
+
     bool isDisabled = false;
     DWORD type = 0;
     if (RegQueryValueExW(hApprovedKey, L"PowerMateControl", nullptr, &type, binaryStatus, &dwSize) == ERROR_SUCCESS) {

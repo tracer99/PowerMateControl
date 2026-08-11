@@ -1,3 +1,8 @@
+/**
+ * @file PowermateManager.cpp
+ * @brief HID enumeration, overlapped read loop, and queued LED feature reports.
+ */
+
 #include "PowermateManager.h"
 #include "TriggerAction.h"
 #include "LedController.h"
@@ -11,13 +16,15 @@
 #include <thread>
 
 namespace {
-constexpr BYTE kFeatureBrightness = 0x01;
-constexpr BYTE kFeaturePulseAlways = 0x03;
-constexpr BYTE kFeaturePulseSpeed = 0x04;
-constexpr DWORD kReadWaitMs = 100;
+constexpr BYTE kFeatureBrightness = 0x01;   /**< LightBrightness feature id. */
+constexpr BYTE kFeaturePulseAlways = 0x03;  /**< LightPulseAlwaysEnabled feature id. */
+constexpr BYTE kFeaturePulseSpeed = 0x04;   /**< LightPulseSpeed feature id. */
+constexpr DWORD kReadWaitMs = 100;          /**< Overlapped read timeout so LED/stop can run. */
 
-// Pulse speed index 4 (~3x slower than Aldaviva mid default 12), big-endian payload.
-// Encode: speed < 8 → (7 - speed) * 2  →  (7 - 4) * 2 = 6 → 0x0006.
+/**
+ * Pulse speed index 4 (~3x slower than Aldaviva mid default 12), big-endian payload.
+ * Encode: speed &lt; 8 → (7 - speed) * 2 → (7 - 4) * 2 = 6 → 0x0006.
+ */
 constexpr BYTE kPulseSpeedHi = 0x00;
 constexpr BYTE kPulseSpeedLo = 0x06;
 }

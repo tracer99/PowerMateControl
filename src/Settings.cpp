@@ -1,8 +1,18 @@
+/**
+ * @file Settings.cpp
+ * @brief Implementation of HKCU\\Software\\PowerMateControl load/save helpers.
+ */
+
 #include "Settings.h"
 #include <iostream>
 
 namespace {
 
+/**
+ * @brief Opens or creates the PowerMateControl settings key for KEY_WRITE.
+ * @param[out] outKey Receives the open HKEY on success (caller must RegCloseKey).
+ * @return true if the key is writable.
+ */
 bool OpenOrCreateWriteKey(HKEY* outKey) {
     DWORD disposition = 0;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, Settings::kRootKey, 0, nullptr, 0, KEY_WRITE, nullptr, outKey, &disposition) != ERROR_SUCCESS) {

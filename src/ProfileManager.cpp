@@ -1,3 +1,8 @@
+/**
+ * @file ProfileManager.cpp
+ * @brief Profile index state, registry load/save, and LED refresh on change.
+ */
+
 #include "ProfileManager.h"
 #include "Settings.h"
 #include "LedController.h"

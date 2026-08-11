@@ -1,3 +1,8 @@
+/**
+ * @file main.cpp
+ * @brief Application entry: single-instance mutex, COM STA, tray UI message loop.
+ */
+
 #include "PowermateManager.h"
 #include "ProfileManager.h"
 #include "AudioVolume.h"
@@ -8,8 +13,11 @@
 #include <objbase.h>
 #include <iostream>
 
-TrayIcon trayIcon;
+TrayIcon trayIcon; /**< Global tray UI owner for the process lifetime. */
 
+/**
+ * @brief Allocates a console and redirects stdout/stderr when launched with -debug.
+ */
 void InitConsole() {
     if (AllocConsole()) {
         FILE* out = nullptr;
@@ -21,6 +29,17 @@ void InitConsole() {
     }
 }
 
+/**
+ * @brief Process entry point.
+ *
+ * Startup order: single-instance mutex, optional -debug console, CoInitializeEx(STA),
+ * profile + audio init, tray window, device open/read, message pump. Shutdown stops HID
+ * I/O, tears down WASAPI, then CoUninitialize.
+ *
+ * @param hInstance Module instance for window/class registration.
+ * @param cmdLine Command line; presence of "-debug" enables the console.
+ * @return Process exit code (0 on normal Exit / second-instance early out).
+ */
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR cmdLine, int) {
     HANDLE hMutex = CreateMutex(NULL, TRUE, L"UniqueAppMutexName");
     if (!hMutex) {

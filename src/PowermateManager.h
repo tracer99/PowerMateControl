@@ -39,20 +39,39 @@ public:
     static bool FindAndOpenDevice();
 
     /**
-     * @brief Starts the background input thread if connected and not already running.
+     * @brief Starts the background input thread if it is not already running.
+     *
+     * The thread owns reconnection: it runs whether or not a device is currently
+     * present, retrying with backoff, so it must never be stopped except on exit.
      */
     static void StartReading();
 
     /**
      * @brief Stops the input thread, cancels outstanding I/O, and closes the device.
+     * @note Shutdown only. Suspend / unplug must not stop the thread or the app
+     *       loses its ability to reconnect on its own.
      */
     static void Stop();
 
     /**
-     * @brief Handles WM_DEVICECHANGE / power-broadcast style connect, remove, suspend, resume.
-     * @param wParam Device or power event code (e.g. DBT_DEVICEARRIVAL, PBT_APMSUSPEND).
+     * @brief Asks the input thread to drop any current handle and reopen the device.
+     * @note Safe from the UI thread; the handle is closed on the input thread.
+     */
+    static void RequestReconnect();
+
+    /**
+     * @brief Handles WM_DEVICECHANGE events (DBT_DEVICEARRIVAL, DBT_DEVICEREMOVECOMPLETE).
+     * @param wParam Device event code from WM_DEVICECHANGE.
      */
     static void HandleDeviceChange(WPARAM wParam);
+
+    /**
+     * @brief Handles WM_POWERBROADCAST suspend / resume events.
+     * @param wParam Power event code (e.g. PBT_APMSUSPEND, PBT_APMRESUMEAUTOMATIC).
+     * @note Kept separate from HandleDeviceChange because DBT_* and PBT_* codes
+     *       overlap (DBT_DEVNODES_CHANGED == PBT_APMRESUMESUSPEND == 0x0007).
+     */
+    static void HandlePowerEvent(WPARAM wParam);
 
     /**
      * @brief Forwards a decoded input event to TriggerAction.
@@ -106,9 +125,26 @@ private:
 
     /**
      * @brief Cancels outstanding I/O, closes the handle, and clears the connected flag.
-     * @note Takes deviceMutex; unblocks Stop() when a ReadFile is pending.
+     * @note Input thread only (or after it has been joined) so a handle value can
+     *       never be recycled underneath a pending read.
      */
     static void CancelAndCloseHandle();
+
+    /**
+     * @brief Re-enumerates to confirm the device is still attached.
+     * @return false once the device has gone away without a read error or a
+     *         removal broadcast surfacing.
+     */
+    static bool IsDeviceStillPresent();
+
+    /** @brief Wakes the input thread out of its reconnect backoff wait. */
+    static void WakeInputLoop();
+
+    /**
+     * @brief Waits up to @p ms for a wake signal (reconnect request or shutdown).
+     * @param ms Backoff duration.
+     */
+    static void WaitForRetry(int ms);
 
     static std::atomic<bool> running;       /**< Input thread should keep looping. */
     static std::atomic<bool> connected;     /**< Device open and considered usable. */
@@ -116,6 +152,8 @@ private:
     static std::atomic<bool> ledPending;    /**< True when LED state awaits ApplyPendingLed. */
     static std::atomic<BYTE> ledBrightness; /**< Queued solid brightness. */
     static std::atomic<bool> ledPulse;      /**< Queued pulse-on flag. */
+    static std::atomic<bool> reopenRequested; /**< Set by UI thread; input thread reopens. */
     static std::thread inputThread;         /**< Background HID read thread. */
-    static std::mutex deviceMutex;          /**< Serializes handle open/close and StartReading. */
+    static std::mutex deviceMutex;          /**< Serializes handle open/close and reads. */
+    static std::mutex threadMutex;          /**< Serializes StartReading / Stop lifecycle. */
 };

@@ -26,6 +26,24 @@ public:
     static void Shutdown();
 
     /**
+     * @brief Releases and re-activates the default render endpoint.
+     * @return true if the endpoint is usable again.
+     * @note Must run on the COM-initialized UI thread (see NeedsReset).
+     */
+    static bool Reset();
+
+    /**
+     * @brief True when a call saw an invalidated endpoint and a Reset is owed.
+     *
+     * Volume calls arrive on the HID input thread, which has no COM apartment, so
+     * recovery is deferred to the UI thread's watchdog instead of done in place.
+     */
+    static bool NeedsReset();
+
+    /** @brief Marks the endpoint as needing re-activation (e.g. after system resume). */
+    static void MarkForReset();
+
+    /**
      * @brief Reads master volume scalar and mute for the default render endpoint.
      * @param[out] scalar Volume in [0, 1] on success.
      * @param[out] muted Mute flag on success.

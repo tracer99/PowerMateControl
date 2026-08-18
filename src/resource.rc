@@ -37,7 +37,7 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName",      "PowerMateControl"
-            VALUE "FileDescription",  "Griffin PowerMate USB tray control"
+            VALUE "FileDescription",  "PowerMate USB tray control"
             VALUE "FileVersion",      PMC_VERSION_STRING
             VALUE "InternalName",     "PowerMateControl"
             VALUE "LegalCopyright",   "MIT License"

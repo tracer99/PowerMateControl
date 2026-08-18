@@ -72,7 +72,7 @@ C++ standard: **C++17** or later (`std::atomic`, `std::thread`, `std::mutex`).
 
 ## Quick start (prebuilt)
 
-1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.4.2**).
+1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.4.3**).
 2. Extract and run `PowerMateControl.exe`.
 3. Plug in the PowerMate USB. A tray icon appears (connected / disconnected).
 4. Right-click the tray icon to choose a profile, enable **Run at startup**, or **Exit**.
@@ -139,7 +139,7 @@ This project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH
 
 | File | Role |
 |---|---|
-| `VERSION` | Canonical version string (e.g. `1.4.2`) |
+| `VERSION` | Canonical version string (e.g. `1.4.3`) |
 | `CHANGELOG.md` | Human-readable release notes per version |
 | `src/version.h` | Embedded in the binary / Windows file properties |
 
@@ -186,7 +186,7 @@ Tray menu:
 
 Volume changes use the default render endpoint directly (no Windows volume OSD).
 
-Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, and sleep/resume are handled via `WM_DEVICECHANGE` / `WM_POWERBROADCAST`.
+Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, and sleep/resume are handled via `WM_DEVICECHANGE` / `WM_POWERBROADCAST`, backed by a reader thread that reopens the device with backoff and a tray watchdog, so the app recovers on its own even when a resume or device-arrival broadcast is missed.
 
 ## Project layout
 
@@ -194,7 +194,7 @@ Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, 
 PowerMateControl/
 ├── .github/workflows/      # CI build + tagged releases
 ├── CHANGELOG.md            # Keep a Changelog release notes
-├── VERSION                 # Semver source of truth (1.4.2)
+├── VERSION                 # Semver source of truth (1.4.3)
 ├── LICENSE
 ├── README.md
 ├── scripts/

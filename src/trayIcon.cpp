@@ -6,6 +6,8 @@
 #include "trayIcon.h"
 #include "PowermateManager.h"
 #include "ProfileManager.h"
+#include "AudioVolume.h"
+#include "LedController.h"
 #include "Settings.h"
 #include "AboutDialog.h"
 #include "resource.h"
@@ -22,11 +24,17 @@ TrayIcon::TrayIcon() {
 }
 
 TrayIcon::~TrayIcon() {
+    if (hwndTray) {
+        KillTimer(hwndTray, kWatchdogTimerId);
+    }
     Shell_NotifyIcon(NIM_DELETE, &nid);
     DestroyIcon(deviceIcons[true]);
     DestroyIcon(deviceIcons[false]);
     if (hDevNotify) {
         UnregisterDeviceNotification(hDevNotify);
+    }
+    if (hPowerNotify) {
+        UnregisterSuspendResumeNotification(hPowerNotify);
     }
     if (hMenu) {
         DestroyMenu(hMenu);
@@ -62,6 +70,9 @@ HWND TrayIcon::CreateTrayWindow(HINSTANCE hInstance) {
         &NotificationFilter,
         DEVICE_NOTIFY_WINDOW_HANDLE
     );
+
+    // Explicit registration so resume events still arrive under modern standby.
+    hPowerNotify = RegisterSuspendResumeNotification(hwndTray, DEVICE_NOTIFY_WINDOW_HANDLE);
     return hwndTray;
 }
 
@@ -76,10 +87,33 @@ void TrayIcon::InitTrayIcon(HWND hwnd) {
     hMenu = CreatePopupMenu();
     SyncAutostartPreference();
     UpdateTrayIcon();
+    SetTimer(hwnd, kWatchdogTimerId, kWatchdogIntervalMs, nullptr);
+}
+
+void TrayIcon::PollDeviceState() {
+    // The reader thread reconnects on its own; mirror whatever it settled on and
+    // make sure it is still alive (belt and braces if a resume/arrival broadcast
+    // never reaches us).
+    const bool isConnected = PowermateManager::IsConnected();
+
+    if (isConnected != lastConnected) {
+        UpdateTrayIcon();
+    }
+
+    if (!isConnected) {
+        PowermateManager::StartReading();
+    }
+
+    // COM lives on this thread, so endpoint re-activation is done here rather than
+    // wherever the failing volume call happened.
+    if (AudioVolume::NeedsReset() && AudioVolume::Reset()) {
+        LedController::Refresh();
+    }
 }
 
 void TrayIcon::UpdateTrayIcon() {
     bool isConnected = PowermateManager::IsConnected();
+    lastConnected = isConnected;
     nid.hIcon = deviceIcons[isConnected];
     wcscpy_s(nid.szTip, isConnected ? L"Powermate Connected" : L"Powermate Disconnected");
     Shell_NotifyIcon(NIM_MODIFY, &nid);
@@ -150,16 +184,24 @@ LRESULT CALLBACK TrayIcon::TrayWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
 
         case WM_DEVICECHANGE: {
             PowermateManager::HandleDeviceChange(wParam);
-            trayIcon->UpdateTrayIcon();
             return 0;
         }
 
         case WM_POWERBROADCAST: {
-            if (wParam == PBT_APMSUSPEND || wParam == PBT_APMRESUMESUSPEND) {
-                PowermateManager::HandleDeviceChange(wParam);
-                trayIcon->UpdateTrayIcon();
+            PowermateManager::HandlePowerEvent(wParam);
+            if (wParam == PBT_APMRESUMEAUTOMATIC || wParam == PBT_APMRESUMESUSPEND ||
+                wParam == PBT_APMRESUMECRITICAL) {
+                // Endpoint may be reset by the resume; watchdog re-activates it.
+                AudioVolume::MarkForReset();
             }
             return TRUE;
+        }
+
+        case WM_TIMER: {
+            if (wParam == kWatchdogTimerId) {
+                trayIcon->PollDeviceState();
+            }
+            return 0;
         }
 
         default:

@@ -78,9 +78,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR cmdLine, int) {
         return -1;
     }
 
-    if (PowermateManager::FindAndOpenDevice()) {
-        PowermateManager::StartReading();
-    }
+    // Start the reader unconditionally: it owns reconnect-with-backoff, so the
+    // app recovers from a device that is absent now or drops out later.
+    PowermateManager::FindAndOpenDevice();
+    PowermateManager::StartReading();
 
     trayIcon.InitTrayIcon(hwnd);
     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&trayIcon));

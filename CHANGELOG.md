@@ -9,6 +9,19 @@ Version numbers follow the upstream [magouill/PowerMateControl](https://github.c
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-08-18
+
+### Fixed
+
+- PowerMate stops responding after sleep/resume or a disconnect until the app is restarted. Suspend no longer tears down the HID reader thread, which is the only component that can reconnect on its own; it now keeps running and reopens the device with backoff.
+- Resume is detected on every wake. `PBT_APMRESUMEAUTOMATIC` was ignored and only `PBT_APMRESUMESUSPEND` (sent for user-initiated wakes) was handled; the app also now registers for suspend/resume notifications explicitly.
+- Device and power events are handled separately, so a `DBT_DEVNODES_CHANGED` broadcast is no longer mistaken for a resume (both are `0x0007`).
+- A tray watchdog re-checks the connection every few seconds, so the icon reflects reality and the reader is restarted even if a resume or device-arrival broadcast never arrives.
+- A removal without a broadcast (dock or hub that never re-enumerates) is detected while the device is idle instead of leaving the app silently connected to a dead handle.
+- Unexpected `ReadFile` errors reconnect instead of ending the reader thread permanently, and a restart can no longer hit `std::terminate` by assigning over a joinable thread.
+- The device handle is only opened and closed on the reader thread, so a handle value cannot be recycled underneath a pending read.
+- The WASAPI endpoint is re-activated after resume or a default-device change, so volume and mute keep working (previously an invalidated endpoint was never recovered). Endpoint teardown no longer risks deadlocking against an in-flight volume-change callback.
+
 ## [1.4.2] - 2026-07-28
 
 ### Added
@@ -82,7 +95,8 @@ Matches upstream [v1.2.0](https://github.com/magouill/PowerMateControl/releases/
 
 - Bluetooth PowerMate is not supported.
 
-[Unreleased]: https://github.com/tracer99/PowerMateControl/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/tracer99/PowerMateControl/compare/v1.4.3...HEAD
+[1.4.3]: https://github.com/tracer99/PowerMateControl/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/tracer99/PowerMateControl/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/tracer99/PowerMateControl/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/tracer99/PowerMateControl/compare/v1.3.1...v1.4.0

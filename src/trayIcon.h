@@ -24,14 +24,18 @@
  */
 class TrayIcon {
 private:
-    NOTIFYICONDATA nid;                              /**< Shell_NotifyIcon payload. */
-    HMENU hMenu;                                     /**< Rebuilt context menu. */
-    HWND hwndTray;                                   /**< Hidden tray owner window. */
-    HDEVNOTIFY hDevNotify;                           /**< HID device interface notify handle. */
+    NOTIFYICONDATA nid{};                            /**< Shell_NotifyIcon payload. */
+    HMENU hMenu = nullptr;                           /**< Rebuilt context menu. */
+    HWND hwndTray = nullptr;                         /**< Hidden tray owner window. */
+    HDEVNOTIFY hDevNotify = nullptr;                 /**< HID device interface notify handle. */
+    HPOWERNOTIFY hPowerNotify = nullptr;             /**< Suspend/resume notify handle. */
+    bool lastConnected = false;                      /**< Last state painted into the tray icon. */
     std::map<bool, HICON> deviceIcons;               /**< Icons for connected / disconnected. */
     std::vector<std::wstring> cachedProfiles = ProfileManager::GetProfileList();
 
 public:
+    static constexpr UINT kWatchdogTimerId = 1;       /**< WM_TIMER id for the connection watchdog. */
+    static constexpr UINT kWatchdogIntervalMs = 3000; /**< Watchdog poll interval. */
     static constexpr UINT ID_TRAY_EXIT = 10000;       /**< Menu: Exit. */
     static constexpr UINT ID_TRAY_ABOUT = 4002;       /**< Menu: About. */
     static constexpr UINT ID_TRAY_AUTOSTART = 4001;   /**< Menu: Run at startup. */
@@ -64,6 +68,15 @@ public:
      * @brief Updates icon/tooltip from PowermateManager::IsConnected and rebuilds the menu.
      */
     void UpdateTrayIcon();
+
+    /**
+     * @brief Watchdog tick: repaints the icon on state changes and keeps the reader alive.
+     *
+     * Reconnection happens on the reader thread, and a resume or arrival broadcast can
+     * be missed entirely (e.g. modern standby, or a hub that never re-enumerates), so
+     * the tray polls instead of trusting notifications alone.
+     */
+    void PollDeviceState();
 
     /**
      * @brief Rebuilds the context menu (status, profiles, autostart, About, Exit).

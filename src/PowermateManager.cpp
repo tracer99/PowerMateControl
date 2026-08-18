@@ -27,6 +27,20 @@ constexpr DWORD kReadWaitMs = 100;          /**< Overlapped read timeout so LED/
  */
 constexpr BYTE kPulseSpeedHi = 0x00;
 constexpr BYTE kPulseSpeedLo = 0x06;
+
+constexpr int kReconnectMinMs = 1000;      /**< First reconnect delay after a drop. */
+constexpr int kReconnectMaxMs = 8000;      /**< Ceiling for the reconnect backoff. */
+constexpr int kIdleReadsPerCheck = 30;     /**< Idle read timeouts between liveness checks (~3s). */
+
+/**
+ * Auto-reset wake event for the input thread's backoff wait.
+ * Created once and intentionally never closed so RequestReconnect / Stop can
+ * signal it without racing thread teardown.
+ */
+HANDLE GetWakeEvent() {
+    static HANDLE wake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    return wake;
+}
 }
 
 std::atomic<bool> PowermateManager::running(false);
@@ -35,8 +49,10 @@ std::atomic<HANDLE> PowermateManager::hDevice{ INVALID_HANDLE_VALUE };
 std::atomic<bool> PowermateManager::ledPending{ false };
 std::atomic<BYTE> PowermateManager::ledBrightness{ 0 };
 std::atomic<bool> PowermateManager::ledPulse{ false };
+std::atomic<bool> PowermateManager::reopenRequested{ false };
 std::thread PowermateManager::inputThread;
 std::mutex PowermateManager::deviceMutex;
+std::mutex PowermateManager::threadMutex;
 
 bool PowermateManager::FindPowerMateDevicePath(std::wstring& out) {
     GUID g; HidD_GetHidGuid(&g);
@@ -156,49 +172,95 @@ bool PowermateManager::FindAndOpenDevice() {
 }
 
 void PowermateManager::StartReading() {
-    std::lock_guard<std::mutex> lock(deviceMutex);
+    std::lock_guard<std::mutex> lock(threadMutex);
 
     if (running.load()) return;
-    if (!IsConnected()) return;
+
+    // Reap a thread that exited on its own; assigning over a joinable
+    // std::thread would call std::terminate.
+    if (inputThread.joinable()) {
+        inputThread.join();
+    }
 
     running.store(true);
     inputThread = std::thread(&PowermateManager::InputLoop);
 }
 
+void PowermateManager::WakeInputLoop() {
+    HANDLE wake = GetWakeEvent();
+    if (wake) {
+        SetEvent(wake);
+    }
+}
+
+void PowermateManager::WaitForRetry(int ms) {
+    HANDLE wake = GetWakeEvent();
+    if (!wake) {
+        Sleep(static_cast<DWORD>(ms));
+        return;
+    }
+    WaitForSingleObject(wake, static_cast<DWORD>(ms));
+}
+
+void PowermateManager::RequestReconnect() {
+    reopenRequested.store(true);
+    StartReading();
+    WakeInputLoop();
+}
+
 void PowermateManager::HandleDeviceChange(WPARAM wParam) {
     std::wstring path;
 
-    if (wParam == DBT_DEVICEARRIVAL && FindAndOpenDevice()) {
-        StartReading();
-        return;
+    if (wParam == DBT_DEVICEARRIVAL) {
+        // Fires for every HID arrival; ignore unless we still need a device.
+        if (IsConnected()) return;
+        RequestReconnect();
     } else if (wParam == DBT_DEVICEREMOVECOMPLETE) {
         if (FindPowerMateDevicePath(path)) {
             std::wcerr << L"[Debug] Powermate is still connected\n";
         } else {
             std::wcerr << L"[Debug] Powermate is no longer connected\n";
-            Stop();
-        }
-    } else if (wParam == PBT_APMSUSPEND) {
-        std::wcout << L"[Debug] Suspending, stopping device\n";
-        Stop();
-    } else if (wParam == PBT_APMRESUMESUSPEND) {
-        if (!IsConnected()) {
-            if (FindAndOpenDevice()) {
-                std::wcout << L"[Debug] Reconnected after system resume\n";
-                StartReading();
-            } else {
-                connected.store(false);
-                std::wcerr << L"[Debug] Failed to reconnect Powermate after resume\n";
-            }
+            RequestReconnect();
         }
     }
+}
+
+void PowermateManager::HandlePowerEvent(WPARAM wParam) {
+    switch (wParam) {
+        case PBT_APMSUSPEND:
+            // Drop the handle but leave the reader running; it is what reconnects.
+            std::wcout << L"[Debug] Suspending, dropping device handle\n";
+            RequestReconnect();
+            return;
+
+        // PBT_APMRESUMEAUTOMATIC is the only resume event guaranteed on every wake;
+        // PBT_APMRESUMESUSPEND follows it only for user-initiated wakes.
+        case PBT_APMRESUMEAUTOMATIC:
+        case PBT_APMRESUMESUSPEND:
+        case PBT_APMRESUMECRITICAL:
+            std::wcout << L"[Debug] Resume, reopening device\n";
+            RequestReconnect();
+            return;
+
+        default:
+            return;
+    }
+}
+
+bool PowermateManager::IsDeviceStillPresent() {
+    // Enumeration only: a HID IOCTL on the overlapped handle could complete
+    // asynchronously, and reads that merely time out never reveal a removal we
+    // were not notified about.
+    std::wstring path;
+    return FindPowerMateDevicePath(path);
 }
 
 void PowermateManager::InputLoop() {
     unsigned char buffer[8] = {};
     DWORD bytesRead = 0;
     bool buttonDown = false;
-    int backoffMs = 1000;
+    int backoffMs = kReconnectMinMs;
+    int idleReads = 0;
 
     HANDLE readEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     if (!readEvent) {
@@ -208,14 +270,24 @@ void PowermateManager::InputLoop() {
     }
 
     while (running.load()) {
+        if (reopenRequested.exchange(false)) {
+            CancelAndCloseHandle();
+            backoffMs = kReconnectMinMs;
+            idleReads = 0;
+            buttonDown = false;
+            if (!running.load()) break;
+        }
+
         if (!IsConnected()) {
             if (FindAndOpenDevice()) {
                 std::cout << "[Info] Device reconnected\n";
-                backoffMs = 1000;
+                backoffMs = kReconnectMinMs;
+                idleReads = 0;
+                buttonDown = false;
             } else {
                 std::cerr << "[Debug] Waiting for device...\n";
-                Sleep(backoffMs);
-                backoffMs = (backoffMs * 2 < 10000) ? backoffMs * 2 : 10000;
+                WaitForRetry(backoffMs);
+                backoffMs = (backoffMs * 2 < kReconnectMaxMs) ? backoffMs * 2 : kReconnectMaxMs;
                 continue;
             }
         }
@@ -227,7 +299,8 @@ void PowermateManager::InputLoop() {
         }
 
         if (h == INVALID_HANDLE_VALUE) {
-            Sleep(1000);
+            connected.store(false);
+            WaitForRetry(kReconnectMinMs);
             continue;
         }
 
@@ -247,35 +320,37 @@ void PowermateManager::InputLoop() {
                     CancelIoEx(h, &ov);
                     WaitForSingleObject(readEvent, INFINITE);
                     // Timed out with no input — loop to apply LED / check running.
+                    if (++idleReads >= kIdleReadsPerCheck) {
+                        idleReads = 0;
+                        if (!IsDeviceStillPresent()) {
+                            std::cerr << "[Debug] Device no longer enumerated; reopening\n";
+                            CancelAndCloseHandle();
+                        }
+                    }
                     continue;
                 }
+                idleReads = 0;
                 if (!GetOverlappedResult(h, &ov, &bytesRead, FALSE)) {
                     err = GetLastError();
                     if (err == ERROR_OPERATION_ABORTED) {
                         continue;
                     }
                     std::cerr << "[Error] GetOverlappedResult failed: " << err << "\n";
-                    connected.store(false);
                     CancelAndCloseHandle();
                     if (!running.load()) {
                         break;
                     }
                     continue;
                 }
-            } else if (err == ERROR_DEVICE_NOT_CONNECTED || err == ERROR_INVALID_HANDLE ||
-                       err == ERROR_OPERATION_ABORTED) {
+            } else {
+                // Any read failure is recoverable: drop the handle and let the
+                // reconnect backoff above reopen the device.
                 std::cerr << "[Error] ReadFile failed: " << err << "\n";
-                connected.store(false);
                 CancelAndCloseHandle();
                 if (!running.load()) {
                     break;
                 }
                 continue;
-            } else {
-                std::cerr << "[Error] ReadFile failed: " << err << "\n";
-                connected.store(false);
-                CancelAndCloseHandle();
-                break;
             }
         }
 
@@ -311,12 +386,18 @@ void PowermateManager::HandleInput(PowermateInputType inputType) {
 
 void PowermateManager::Stop() {
     running.store(false);
-    // Unblock overlapped ReadFile so join cannot hang until the knob moves.
-    CancelAndCloseHandle();
+    // Unblock the reconnect backoff; a pending read tops out at kReadWaitMs.
+    WakeInputLoop();
 
-    if (inputThread.joinable()) {
-        inputThread.join();
+    {
+        std::lock_guard<std::mutex> lock(threadMutex);
+        if (inputThread.joinable()) {
+            inputThread.join();
+        }
     }
+
+    // Only ever close the handle once no read can be in flight.
+    CancelAndCloseHandle();
 }
 
 void PowermateManager::CloseDevice() {

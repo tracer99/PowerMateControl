@@ -17,10 +17,17 @@
 
 namespace {
 
-constexpr const wchar_t* kRepoUrl = L"https://github.com/tracer99/PowerMateControl";
+constexpr const wchar_t* kWebUrl = L"https://tracer99.github.io/PowerMateControl/";
 constexpr const wchar_t* kIssuesUrl = L"https://github.com/tracer99/PowerMateControl/issues";
 constexpr const wchar_t* kKofiUrl = L"https://ko-fi.com/tracer_ca";
 constexpr const wchar_t* kMaintainer = L"Maintainer: tracer99";
+#if defined(_M_ARM64)
+constexpr const wchar_t* kArch = L"ARM64";
+#elif defined(_M_X64)
+constexpr const wchar_t* kArch = L"x64";
+#else
+constexpr const wchar_t* kArch = L"unknown";
+#endif
 
 /** @brief Per-dialog HWND user data: owned logo bitmap. */
 struct AboutState {
@@ -194,7 +201,7 @@ void OpenUrl(const wchar_t* url) {
 }
 
 /**
- * @brief Dialog procedure for IDD_ABOUT (logo, version, GitHub / issues / Ko-fi / OK).
+ * @brief Dialog procedure for IDD_ABOUT (logo, version, Web / issues / Ko-fi / OK).
  */
 INT_PTR CALLBACK AboutDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -210,7 +217,7 @@ INT_PTR CALLBACK AboutDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             }
 
             wchar_t version[64] = {};
-            swprintf_s(version, L"Version %hs", PMC_VERSION_STRING);
+            swprintf_s(version, L"Version %hs (%s)", PMC_VERSION_STRING, kArch);
             SetDlgItemTextW(hwnd, IDC_ABOUT_VERSION, version);
             SetDlgItemTextW(hwnd, IDC_ABOUT_MAINTAINER, kMaintainer);
             return TRUE;
@@ -219,7 +226,7 @@ INT_PTR CALLBACK AboutDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         case WM_COMMAND: {
             switch (LOWORD(wParam)) {
                 case IDC_ABOUT_GITHUB:
-                    OpenUrl(kRepoUrl);
+                    OpenUrl(kWebUrl);
                     return TRUE;
                 case IDC_ABOUT_ISSUES:
                     OpenUrl(kIssuesUrl);

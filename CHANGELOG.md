@@ -9,6 +9,17 @@ Version numbers follow the upstream [magouill/PowerMateControl](https://github.c
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-08-20
+
+### Added
+
+- Official ARM64 Release binary alongside x64 (`PowerMateControl-<version>-windows-arm64.zip`)
+- About dialog shows the binary architecture (`x64` or `ARM64`) next to the version
+
+### Changed
+
+- About dialog **Web** button opens the GitHub Pages homepage instead of the repository
+
 ## [1.4.3] - 2026-08-18
 
 ### Fixed
@@ -95,7 +106,8 @@ Matches upstream [v1.2.0](https://github.com/magouill/PowerMateControl/releases/
 
 - Bluetooth PowerMate is not supported.
 
-[Unreleased]: https://github.com/tracer99/PowerMateControl/compare/v1.4.3...HEAD
+[Unreleased]: https://github.com/tracer99/PowerMateControl/compare/v1.4.4...HEAD
+[1.4.4]: https://github.com/tracer99/PowerMateControl/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/tracer99/PowerMateControl/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/tracer99/PowerMateControl/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/tracer99/PowerMateControl/compare/v1.4.0...v1.4.1

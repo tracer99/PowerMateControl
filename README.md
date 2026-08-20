@@ -42,7 +42,7 @@ If you find it useful, you can [support the maintainer on Ko-fi](https://ko-fi.c
 | Requirement | Details |
 |---|---|
 | OS | Windows 11 (Win32 APIs used may also work on Windows 10) |
-| Architecture | x64 |
+| Architecture | x64 or ARM64 (native Windows on ARM, e.g. Snapdragon) |
 | Hardware | Griffin **PowerMate USB** only — VID `077D`, PID `0410` |
 | Drivers | Standard Windows HID driver (no custom driver or Zadig install needed) |
 
@@ -50,7 +50,7 @@ Bluetooth PowerMate is **not** supported.
 
 ### Build toolchain
 
-This repo ships source only (no Visual Studio solution or CMake project). CI builds an x64 GUI binary with MSVC on `windows-latest` (Visual Studio 2022).
+This repo ships source only (no Visual Studio solution or CMake project). CI builds x64 and ARM64 GUI binaries with MSVC on `windows-latest` (Visual Studio 2022).
 
 Install locally:
 
@@ -58,6 +58,7 @@ Install locally:
 2. Workload: **Desktop development with C++**
 3. Components (defaults are usually enough):
    - MSVC v143 C++ x64/x86 build tools
+   - MSVC v143 C++ ARM64 build tools (for ARM64 binaries)
    - Windows 10/11 SDK
    - C++ ATL / Windows SDK support for HID headers (`hidsdi.h`, `setupapi.h`)
 
@@ -74,14 +75,14 @@ C++ standard: **C++17** or later (`std::atomic`, `std::thread`, `std::mutex`).
 
 ## Quick start (prebuilt)
 
-1. Download `PowerMateControl-<version>-windows-x64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.4.3**).
+1. Download `PowerMateControl-<version>-windows-x64.zip` or `PowerMateControl-<version>-windows-arm64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.4.4**). Use the ARM64 zip on native Windows on ARM.
 2. Extract and run `PowerMateControl.exe`.
 3. Plug in the PowerMate USB. A tray icon appears (connected / disconnected).
 4. Right-click the tray icon to choose a profile, enable **Run at startup**, or **Exit**.
 
 The last-selected profile is restored on startup. In the **Volume** profile, the PowerMate LED brightness tracks the system master volume; it pulses when muted (or volume is zero). In **Scroll**, the LED pulses.
 
-CI uploads a versioned Windows x64 artifact on PRs and on non-release pushes to `main` (handy before a tagged release). Commits whose message starts with `release:` skip the main-branch job so tagging does not run the Windows build twice.
+CI uploads versioned Windows x64 and ARM64 artifacts on PRs and on non-release pushes to `main` (handy before a tagged release). Commits whose message starts with `release:` skip the main-branch job so tagging does not run the Windows build twice.
 
 ## Build from source
 
@@ -94,32 +95,39 @@ cd PowerMateControl
 
 ### 2. Open a Visual Studio developer shell
 
-Use an **x64 Native Tools** environment so `cl`, `rc`, and `link` are on `PATH`:
+Use a Visual Studio developer shell so `cl`, `rc`, and `link` are on `PATH` for the architecture you are building:
 
-- Start menu → **x64 Native Tools Command Prompt for VS 2022**, or
-- In PowerShell:
+- Start menu → **x64 Native Tools Command Prompt for VS 2022**, or **ARM64** tools (cross-compile from x64 with Host x64 / Target ARM64)
+- In PowerShell (x64):
 
 ```powershell
 & "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64
+```
+
+- ARM64 (cross from an x64 host):
+
+```powershell
+& "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1" -Arch arm64 -HostArch amd64
 ```
 
 (Adjust `Community` to `Professional`, `Enterprise`, or `BuildTools` as installed.)
 
 ### 3. Compile
 
-From the repo root (same script CI uses):
+From the repo root (same script CI uses). Default architecture is x64:
 
 ```powershell
 .\scripts\build.ps1 -Configuration Release
+.\scripts\build.ps1 -Configuration Release -Architecture ARM64
 ```
 
-Output: `build\PowerMateControl.exe`
+Output: `build\x64\PowerMateControl.exe` and `build\arm64\PowerMateControl.exe`
 
 Debug:
 
 ```powershell
 .\scripts\build.ps1 -Configuration Debug
-.\build\PowerMateControl.exe -debug
+.\build\x64\PowerMateControl.exe -debug
 ```
 
 (`-debug` allocates a console for log output.)
@@ -130,7 +138,7 @@ There is no `.sln` / `.vcxproj` in the tree. To work in the IDE:
 
 1. **File → New → Project from Existing Code** (or create an empty C++ Windows Desktop project).
 2. Add all files under `src\`.
-3. Configuration: **x64**, Character Set **Unicode**, SubSystem **Windows**.
+3. Configuration: **x64** or **ARM64**, Character Set **Unicode**, SubSystem **Windows**.
 4. C++ Language Standard: **ISO C++17**.
 5. Linker → Input → Additional Dependencies: `setupapi.lib;hid.lib;shell32.lib;%(AdditionalDependencies)`.
 6. Ensure the resource compiler can find `res\connected.ico` and `res\disconnected.ico` (paths in `resource.rc` are relative to `src\`).
@@ -145,7 +153,7 @@ This project uses [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH
 | `CHANGELOG.md` | Human-readable release notes per version |
 | `src/version.h` | Embedded in the binary / Windows file properties |
 
-GitHub Actions builds on PRs and on non-release pushes to `main`. Pushing an annotated tag `vX.Y.Z` that matches `VERSION` builds once and publishes a GitHub Release whose body is taken from that version’s changelog section, with asset `PowerMateControl-X.Y.Z-windows-x64.zip`.
+GitHub Actions builds on PRs and on non-release pushes to `main`. Pushing an annotated tag `vX.Y.Z` that matches `VERSION` builds once and publishes a GitHub Release whose body is taken from that version’s changelog section, with assets `PowerMateControl-X.Y.Z-windows-x64.zip` and `PowerMateControl-X.Y.Z-windows-arm64.zip`.
 
 ### Cut a release
 
@@ -183,7 +191,7 @@ Tray menu:
 - Connection status
 - Profile selection (**Scroll** / **Volume**) — persisted as `Profile` under `HKCU\Software\PowerMateControl`
 - **Run at startup** — writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\PowerMateControl` and mirrors `Autostart` under `HKCU\Software\PowerMateControl`
-- **About...** — logo, version, maintainer (`tracer99`), links to GitHub, issues, and [Ko-fi](https://ko-fi.com/tracer_ca)
+- **About...** — logo, version, maintainer (`tracer99`), links to the [project homepage](https://tracer99.github.io/PowerMateControl/), issues, and [Ko-fi](https://ko-fi.com/tracer_ca)
 - **Exit**
 
 Volume changes use the default render endpoint directly (no Windows volume OSD).
@@ -196,18 +204,18 @@ Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, 
 PowerMateControl/
 ├── .github/workflows/      # CI build + tagged releases
 ├── CHANGELOG.md            # Keep a Changelog release notes
-├── VERSION                 # Semver source of truth (1.4.3)
+├── VERSION                 # Semver source of truth (1.4.4)
 ├── LICENSE
 ├── README.md
 ├── scripts/
-│   ├── build.ps1           # Shared MSVC build (local + CI)
+│   ├── build.ps1           # Shared MSVC build (local + CI; x64 / ARM64)
 │   ├── release.ps1         # Bump version / create vX.Y.Z tag
 │   └── Get-ProjectVersion.ps1
 ├── res/                    # Icons, logo, screenshot assets
 └── src/
     ├── main.cpp            # wWinMain, COM init, -debug
     ├── version.h           # PMC_VERSION_* (synced with VERSION)
-    ├── AboutDialog.*       # Tray About pane (logo, version, GitHub / Ko-fi links)
+    ├── AboutDialog.*       # Tray About pane (logo, version, Web / Ko-fi links)
     ├── Settings.*          # HKCU profile + autostart persistence
     ├── AudioVolume.*       # WASAPI master volume read/write + change notify
     ├── LedController.*     # Profile/volume → LED brightness / pulse

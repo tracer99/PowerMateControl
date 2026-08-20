@@ -61,14 +61,23 @@ jobs:
           Get-Content release-notes.md
 
       # Composite action (no Node runtime). Replaces ilammy/msvc-dev-cmd@v1 (Node 20).
-      - name: Setup MSVC environment
+      - name: Setup MSVC x64
         uses: egor-tensin/vs-shell@v2
         with:
           arch: x64
 
-      - name: Build
+      - name: Build x64
         shell: pwsh
-        run: .\scripts\build.ps1 -Configuration Release
+        run: .\scripts\build.ps1 -Configuration Release -Architecture x64
+
+      - name: Setup MSVC ARM64
+        uses: egor-tensin/vs-shell@v2
+        with:
+          arch: amd64_arm64
+
+      - name: Build ARM64
+        shell: pwsh
+        run: .\scripts\build.ps1 -Configuration Release -Architecture ARM64
 
       # VS may spawn vctip.exe; stop it so the runner does not warn about orphan processes.
       - name: Stop MSVC tip process
@@ -80,17 +89,22 @@ jobs:
         shell: pwsh
         run: |
           $v = "${{ steps.version.outputs.version }}"
-          $zip = "PowerMateControl-$v-windows-x64.zip"
-          Compress-Archive -Path .\build\PowerMateControl.exe -DestinationPath .\$zip -Force
-          Get-Item .\build\PowerMateControl.exe, .\$zip | Format-Table Name, Length
+          foreach ($arch in @("x64", "arm64")) {
+            $exe = ".\build\$arch\PowerMateControl.exe"
+            $zip = "PowerMateControl-$v-windows-$arch.zip"
+            Compress-Archive -Path $exe -DestinationPath .\$zip -Force
+          }
+          Get-Item .\build\x64\PowerMateControl.exe, .\build\arm64\PowerMateControl.exe, .\PowerMateControl-$v-windows-*.zip | Format-Table Name, Length
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5
         with:
-          name: PowerMateControl-${{ steps.version.outputs.version }}-windows-x64
+          name: PowerMateControl-${{ steps.version.outputs.version }}-windows
           path: |
-            build/PowerMateControl.exe
+            build/x64/PowerMateControl.exe
+            build/arm64/PowerMateControl.exe
             PowerMateControl-${{ steps.version.outputs.version }}-windows-x64.zip
+            PowerMateControl-${{ steps.version.outputs.version }}-windows-arm64.zip
           if-no-files-found: error
 
       - name: Create GitHub release
@@ -99,7 +113,9 @@ jobs:
         with:
           name: PowerMateControl ${{ steps.version.outputs.version }}
           body_path: release-notes.md
-          files: PowerMateControl-${{ steps.version.outputs.version }}-windows-x64.zip
+          files: |
+            PowerMateControl-${{ steps.version.outputs.version }}-windows-x64.zip
+            PowerMateControl-${{ steps.version.outputs.version }}-windows-arm64.zip
           fail_on_unmatched_files: true
           draft: false
           prerelease: false

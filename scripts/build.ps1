@@ -1,7 +1,12 @@
-# Requires an MSVC x64 developer environment (cl, rc, link on PATH).
+# Requires a matching MSVC developer environment (cl, rc, link on PATH).
+# x64:   Launch-VsDevShell.ps1 -Arch amd64
+# ARM64: Launch-VsDevShell.ps1 -Arch arm64
+#        (add -HostArch amd64 when cross-compiling from x64 Windows)
 param(
     [ValidateSet("Release", "Debug")]
     [string]$Configuration = "Release",
+    [ValidateSet("x64", "ARM64")]
+    [string]$Architecture = "x64",
     [string]$OutDir = ""
 )
 
@@ -11,8 +16,40 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Get-RepoRoot
 $Version = Get-ProjectVersion
 
+$ArchFolder = $Architecture.ToLowerInvariant()
+$Machine = @{
+    x64   = "X64"
+    ARM64 = "ARM64"
+}[$Architecture]
+
+$ExpectedTgtArch = @{
+    x64   = "x64"
+    ARM64 = "arm64"
+}[$Architecture]
+
+$DevShellHint = if ($Architecture -eq "ARM64") {
+    "Launch-VsDevShell.ps1 -Arch arm64 (add -HostArch amd64 when cross-compiling from x64 Windows)"
+} else {
+    "Launch-VsDevShell.ps1 -Arch amd64"
+}
+
+if ($env:VSCMD_ARG_TGT_ARCH -and $env:VSCMD_ARG_TGT_ARCH -ne $ExpectedTgtArch) {
+    throw "MSVC target arch is '$($env:VSCMD_ARG_TGT_ARCH)' but -Architecture $Architecture was requested. Use $DevShellHint."
+}
+
+$clCmd = Get-Command cl.exe -ErrorAction SilentlyContinue
+if (-not $clCmd) {
+    throw "cl.exe is not on PATH. Open a matching VS developer shell first ($DevShellHint)."
+}
+
+# MSVC layout: ...\bin\Host<host>\<target>\cl.exe (target is x86, x64, or ARM64).
+$clTarget = Split-Path (Split-Path $clCmd.Source -Parent) -Leaf
+if ($clTarget -and $clTarget -ne $Machine) {
+    throw "cl.exe is the $clTarget toolchain ($($clCmd.Source)) but -Architecture $Architecture was requested. Use $DevShellHint."
+}
+
 if (-not $OutDir) {
-    $OutDir = Join-Path $RepoRoot "build"
+    $OutDir = Join-Path $RepoRoot "build\$ArchFolder"
 }
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -56,7 +93,7 @@ $LinkFlags = @(
     $ResPath,
     "/link",
     "/SUBSYSTEM:WINDOWS",
-    "/MACHINE:X64",
+    "/MACHINE:$Machine",
     "setupapi.lib",
     "hid.lib",
     "shell32.lib",
@@ -89,4 +126,4 @@ try {
     Pop-Location
 }
 
-Write-Host "Built $ExePath ($Configuration) version $Version"
+Write-Host "Built $ExePath ($Configuration $Architecture) version $Version"

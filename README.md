@@ -6,6 +6,8 @@
     Windows 11 tray application for the Griffin PowerMate USB device
     <br/>
     Control Windows volume or simulate mouse scroll action.
+    <br/>
+    <a href="https://tracer99.github.io/PowerMateControl/">Project homepage</a>
   </p>
 </p>
 

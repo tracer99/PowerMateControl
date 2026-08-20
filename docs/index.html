@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PowerMateControl — Windows tray app for the Griffin PowerMate USB</title>
+  <meta name="description" content="Windows 11 system tray app for the Griffin PowerMate USB. Control volume or send mouse scroll. No custom drivers.">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="glow" aria-hidden="true"></div>
+  <header class="nav">
+    <a class="brand" href="./">
+      <img src="assets/logo.png" alt="" width="36" height="36">
+      <span>PowerMateControl</span>
+    </a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#usage">Usage</a>
+      <a href="https://github.com/tracer99/PowerMateControl">Source</a>
+      <a class="btn btn-small" href="https://github.com/tracer99/PowerMateControl/releases/latest">Download</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">Windows 11 · USB HID · tray app</p>
+      <h1>A PowerMate that still works on modern Windows.</h1>
+      <p class="lede">
+        System tray control for the Griffin PowerMate USB. Rotate for volume or mouse scroll,
+        click to mute or double-click, LED follows the profile. No custom driver.
+      </p>
+      <div class="cta">
+        <a class="btn" href="https://github.com/tracer99/PowerMateControl/releases/latest">Download latest (x64)</a>
+        <a class="btn btn-ghost" href="https://github.com/tracer99/PowerMateControl">View on GitHub</a>
+      </div>
+      <p class="meta">Current release <strong>1.4.3</strong> · MIT · independently maintained</p>
+      <figure class="hero-art">
+        <img src="assets/logo.png" alt="Griffin PowerMate USB knob">
+      </figure>
+    </section>
+
+    <section id="features" class="section">
+      <h2>Two profiles, one knob</h2>
+      <p class="section-lead">Pick a mode from the tray. The last choice is restored on startup.</p>
+      <div class="grid two">
+        <article class="card">
+          <h3>Volume</h3>
+          <p>Rotate to step the default playback device via WASAPI. Click to mute or unmute. LED brightness tracks master volume; it pulses when muted or at zero. No Windows volume OSD.</p>
+        </article>
+        <article class="card">
+          <h3>Scroll</h3>
+          <p>Rotate to send mouse wheel events. Button release sends a double-click. The hardware LED pulses while this profile is active.</p>
+        </article>
+      </div>
+      <div class="grid three">
+        <article class="card quiet">
+          <h3>Hot-plug &amp; sleep</h3>
+          <p>Reconnects after unplug, hub changes, and sleep/resume — including when Windows never sends the usual device or power broadcast.</p>
+        </article>
+        <article class="card quiet">
+          <h3>Run at startup</h3>
+          <p>Optional logon launch via the current-user Run key, persisted with the rest of the app settings.</p>
+        </article>
+        <article class="card quiet">
+          <h3>Stock HID driver</h3>
+          <p>VID <code>077D</code> / PID <code>0410</code>. Uses the Windows HID stack. Bluetooth PowerMate is not supported.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section split">
+      <div>
+        <h2>Lives in the tray</h2>
+        <p>Right-click the knob icon for connection status, profile, autostart, About, and Exit. Only one instance runs at a time.</p>
+        <ul class="ticks">
+          <li>Connected / disconnected tray icon</li>
+          <li>About pane with version and links</li>
+          <li>Ko-fi support link for the maintainer</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <img src="assets/screenshot1.png" alt="Tray menu showing Scroll profile, Run at startup, and Exit">
+      </figure>
+    </section>
+
+    <section id="usage" class="section">
+      <h2>Knob actions</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Scroll</th>
+              <th>Volume</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Rotate left</td>
+              <td>Scroll down</td>
+              <td>Volume up</td>
+            </tr>
+            <tr>
+              <td>Rotate right</td>
+              <td>Scroll up</td>
+              <td>Volume down</td>
+            </tr>
+            <tr>
+              <td>Button release</td>
+              <td>Mouse double-click</td>
+              <td>Mute / unmute</td>
+            </tr>
+            <tr>
+              <td>LED</td>
+              <td>Hardware pulse</td>
+              <td>Brightness follows volume; pulse when muted or zero</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Requirements</h2>
+      <div class="grid two">
+        <article class="card quiet">
+          <h3>Runtime</h3>
+          <ul>
+            <li>Windows 11 (Win32 APIs may also work on Windows 10)</li>
+            <li>x64</li>
+            <li>Griffin <strong>PowerMate USB</strong> only</li>
+          </ul>
+        </article>
+        <article class="card quiet">
+          <h3>Quick start</h3>
+          <ol>
+            <li>Download the zip from <a href="https://github.com/tracer99/PowerMateControl/releases/latest">Releases</a>.</li>
+            <li>Extract and run <code>PowerMateControl.exe</code>.</li>
+            <li>Plug in the PowerMate. Use the tray icon to pick a profile.</li>
+          </ol>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      Independently user-maintained. Not affiliated with, endorsed by, or connected to Griffin Technology.
+      Forked from <a href="https://github.com/magouill/PowerMateControl">magouill/PowerMateControl</a>.
+      MIT License.
+    </p>
+    <p class="footer-links">
+      <a href="https://github.com/tracer99/PowerMateControl">GitHub</a>
+      <a href="https://github.com/tracer99/PowerMateControl/issues">Issues</a>
+      <a href="https://ko-fi.com/tracer_ca">Ko-fi</a>
+    </p>
+  </footer>
+</body>
+</html>

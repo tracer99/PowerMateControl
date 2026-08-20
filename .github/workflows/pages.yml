@@ -36,6 +36,10 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # Turns Pages on (Actions source) the first time this runs, so the
+          # site does not require a manual visit to repository settings.
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4

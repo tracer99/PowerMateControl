@@ -75,7 +75,7 @@ C++ standard: **C++17** or later (`std::atomic`, `std::thread`, `std::mutex`).
 
 ## Quick start (prebuilt)
 
-1. Download `PowerMateControl-<version>-windows-x64.zip` or `PowerMateControl-<version>-windows-arm64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.4.4**). Use the ARM64 zip on native Windows on ARM.
+1. Download `PowerMateControl-<version>-windows-x64.zip` or `PowerMateControl-<version>-windows-arm64.zip` from this repo’s [Releases](https://github.com/tracer99/PowerMateControl/releases) page (current: **1.4.5**). Use the ARM64 zip on native Windows on ARM.
 2. Extract and run `PowerMateControl.exe`.
 3. Plug in the PowerMate USB. A tray icon appears (connected / disconnected).
 4. Right-click the tray icon to choose a profile, enable **Run at startup**, or **Exit**.
@@ -204,7 +204,7 @@ Only one instance can run (named mutex `UniqueAppMutexName`). Hot-plug, unplug, 
 PowerMateControl/
 ├── .github/workflows/      # CI build + tagged releases
 ├── CHANGELOG.md            # Keep a Changelog release notes
-├── VERSION                 # Semver source of truth (1.4.4)
+├── VERSION                 # Semver source of truth (1.4.5)
 ├── LICENSE
 ├── README.md
 ├── scripts/

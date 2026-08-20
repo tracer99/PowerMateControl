@@ -21,8 +21,13 @@ jobs:
       (github.ref == 'refs/heads/main' &&
        !startsWith(github.event.head_commit.message, 'release:'))
     runs-on: windows-latest
-    permissions:
-      contents: write
+
+    # One VS developer shell per job: vs-shell exports the toolchain through
+    # GITHUB_ENV, so two architectures cannot share a job.
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
 
     steps:
       - name: Checkout
@@ -48,6 +53,63 @@ jobs:
             throw "Tag '$tag' must match VERSION file (expected 'v$v'). Update VERSION/CHANGELOG and retag."
           }
           Test-ChangelogHasVersion $v
+
+      # Composite action (no Node runtime). Replaces ilammy/msvc-dev-cmd@v1 (Node 20).
+      # `arch` is passed straight to VsDevCmd, so only x86/amd64/x64/arm64 are valid
+      # (vcvarsall-style pairs such as `amd64_arm64` are rejected).
+      - name: Setup MSVC ${{ matrix.arch }}
+        uses: egor-tensin/vs-shell@v2
+        with:
+          arch: ${{ matrix.arch }}
+
+      - name: Build ${{ matrix.arch }}
+        shell: pwsh
+        run: .\scripts\build.ps1 -Configuration Release -Architecture ${{ matrix.arch }}
+
+      # VS may spawn vctip.exe; stop it so the runner does not warn about orphan processes.
+      - name: Stop MSVC tip process
+        if: always()
+        shell: pwsh
+        run: Get-Process -Name vctip -ErrorAction SilentlyContinue | Stop-Process -Force
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $arch = "${{ matrix.arch }}"
+          $exe = ".\build\$arch\PowerMateControl.exe"
+          $zip = "PowerMateControl-$v-windows-$arch.zip"
+          Compress-Archive -Path $exe -DestinationPath .\$zip -Force
+          Get-Item $exe, .\$zip | Format-Table Name, Length
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: PowerMateControl-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}
+          path: |
+            build/${{ matrix.arch }}/PowerMateControl.exe
+            PowerMateControl-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.zip
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build release notes
+        id: version
+        shell: pwsh
+        run: |
+          # Forward slashes: this job runs pwsh on Linux.
+          . ./scripts/Get-ProjectVersion.ps1
+          $v = Get-ProjectVersion
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           $notes = Get-ChangelogSection $v
           $repo = "${{ github.repository }}"
           @(
@@ -60,55 +122,13 @@ jobs:
           Write-Host "--- release notes ---"
           Get-Content release-notes.md
 
-      # Composite action (no Node runtime). Replaces ilammy/msvc-dev-cmd@v1 (Node 20).
-      - name: Setup MSVC x64
-        uses: egor-tensin/vs-shell@v2
+      - name: Download build artifacts
+        uses: actions/download-artifact@v5
         with:
-          arch: x64
-
-      - name: Build x64
-        shell: pwsh
-        run: .\scripts\build.ps1 -Configuration Release -Architecture x64
-
-      - name: Setup MSVC ARM64
-        uses: egor-tensin/vs-shell@v2
-        with:
-          arch: amd64_arm64
-
-      - name: Build ARM64
-        shell: pwsh
-        run: .\scripts\build.ps1 -Configuration Release -Architecture ARM64
-
-      # VS may spawn vctip.exe; stop it so the runner does not warn about orphan processes.
-      - name: Stop MSVC tip process
-        if: always()
-        shell: pwsh
-        run: Get-Process -Name vctip -ErrorAction SilentlyContinue | Stop-Process -Force
-
-      - name: Package
-        shell: pwsh
-        run: |
-          $v = "${{ steps.version.outputs.version }}"
-          foreach ($arch in @("x64", "arm64")) {
-            $exe = ".\build\$arch\PowerMateControl.exe"
-            $zip = "PowerMateControl-$v-windows-$arch.zip"
-            Compress-Archive -Path $exe -DestinationPath .\$zip -Force
-          }
-          Get-Item .\build\x64\PowerMateControl.exe, .\build\arm64\PowerMateControl.exe, .\PowerMateControl-$v-windows-*.zip | Format-Table Name, Length
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: PowerMateControl-${{ steps.version.outputs.version }}-windows
-          path: |
-            build/x64/PowerMateControl.exe
-            build/arm64/PowerMateControl.exe
-            PowerMateControl-${{ steps.version.outputs.version }}-windows-x64.zip
-            PowerMateControl-${{ steps.version.outputs.version }}-windows-arm64.zip
-          if-no-files-found: error
+          pattern: PowerMateControl-*-windows-*
+          merge-multiple: true
 
       - name: Create GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
           name: PowerMateControl ${{ steps.version.outputs.version }}

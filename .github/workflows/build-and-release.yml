@@ -22,12 +22,16 @@ jobs:
        !startsWith(github.event.head_commit.message, 'release:'))
     runs-on: windows-latest
 
-    # One VS developer shell per job: vs-shell exports the toolchain through
-    # GITHUB_ENV, so two architectures cannot share a job.
+    # One VS developer shell per job: the shell is entered per step, and a single
+    # job cannot host two architectures.
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, arm64]
+        include:
+          - arch: x64
+            vs_arch: amd64
+          - arch: arm64
+            vs_arch: arm64
 
     steps:
       - name: Checkout
@@ -54,17 +58,18 @@ jobs:
           }
           Test-ChangelogHasVersion $v
 
-      # Composite action (no Node runtime). Replaces ilammy/msvc-dev-cmd@v1 (Node 20).
-      # `arch` is passed straight to VsDevCmd, so only x86/amd64/x64/arm64 are valid
-      # (vcvarsall-style pairs such as `amd64_arm64` are rejected).
-      - name: Setup MSVC ${{ matrix.arch }}
-        uses: egor-tensin/vs-shell@v2
-        with:
-          arch: ${{ matrix.arch }}
-
+      # The dev shell is entered in-process rather than through an action, because
+      # HostArch must be amd64: the runner only ships the x64-hosted ARM64 cross
+      # toolset, and VsDevCmd defaults its host to x86.
       - name: Build ${{ matrix.arch }}
         shell: pwsh
-        run: .\scripts\build.ps1 -Configuration Release -Architecture ${{ matrix.arch }}
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * -property installationPath
+          if (-not $vsPath) { throw "No Visual Studio installation found" }
+          $launch = Join-Path $vsPath 'Common7\Tools\Launch-VsDevShell.ps1'
+          & $launch -Arch ${{ matrix.vs_arch }} -HostArch amd64 -SkipAutomaticLocation
+          .\scripts\build.ps1 -Configuration Release -Architecture ${{ matrix.arch }}
 
       # VS may spawn vctip.exe; stop it so the runner does not warn about orphan processes.
       - name: Stop MSVC tip process
